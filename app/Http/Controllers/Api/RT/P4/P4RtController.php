@@ -15,22 +15,16 @@ class P4RtController extends Controller
 {
     public function index(Request $request)
     {
-        $now = Carbon::now();
-        // $data = RtP4M::orderBy('tgl_buat', 'desc')->get();
         $data = DB::table("rt_p4")
-            ->join("rt_p3", "rt_p4.id_p3_rw", "=", "rt_p3.id")
-            ->join('survey', 'rt_p3.id_survey', '=', 'survey.id')
-            ->select('rt_p4.id', 'rt_p4.nama_ket_rt', 'rt_p4.nik_ket_rt', 'rt_p4.rt')
+            ->select('rt_p4.id', 'rt_p4.nama_ket_rt', 'rt_p4.nik_ket_rt', 'rt_p4.rt', 'rt_p4.id_p3_rw')
             ->where('rt_p4.id_p3_rw', "=", $request->id_p3_rw)
-            ->where('survey.tgl_mulai', '<=', $now)
-            ->where('survey.tgl_akhir', '>=', $now)
-            ->orderBy('rt_p4.tgl_buat', 'desc')
+            ->orderBy('rt_p4.rt', 'asc')
             ->get();
 
         if ($data->isEmpty()) {
             return response()->json([
                 'status' => false,
-                'message' => 'Belum ada data yang tersimpan',
+                'message' => 'Belum ada data RT yang tersimpan',
                 'data' => [],
             ], 200);
         }

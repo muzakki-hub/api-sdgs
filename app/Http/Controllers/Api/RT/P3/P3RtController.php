@@ -17,19 +17,15 @@ class P3RtController extends Controller
 
     public function index()
     {
-        $now = Carbon::now();
         $data = DB::table('rt_p3')
-            ->join('survey', 'rt_p3.id_survey', '=', 'survey.id')
-            ->select('rt_p3.*', 'rt_p3.id as id_p3', 'survey.tgl_mulai', 'survey.tgl_akhir')
-            ->where('tgl_mulai', '<=', $now)
-            ->where('tgl_akhir', '>=', $now)
-            ->orderBy('rt_p3.tgl_buat', 'desc')
+            ->select('rt_p3.*', 'rt_p3.id as id_p3')
+            ->orderBy('rt_p3.nama_rw', 'asc')
             ->get();
 
         if ($data->isEmpty()) {
             return response()->json([
                 'status' => false,
-                'message' => 'Belum ada data yang tersimpan pada periode survey aktif',
+                'message' => 'Belum ada data RW yang tersimpan',
                 'data' => [],
             ], 200);
         }

@@ -23,25 +23,15 @@ class P2Api extends Controller
             ->whereDate('tgl_akhir', '>=', $today)
             ->first();
 
-        if (!$survey) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Belum ada data yang tersimpan pada periode survey aktif',
-                'survey_aktif' => null,
-                'data' => [],
-            ], 200);
-        }
-
-        // Ambil data lokasi keluarga (P2) hanya pada periode survei aktif
+        // Ambil data lokasi keluarga (P2)
         $data = P2::with('survey')
-            ->where('id_survey', $survey->id)
             ->orderBy('tgl_buat', 'desc')
             ->get();
 
         if ($data->isEmpty()) {
             return response()->json([
                 'status' => false,
-                'message' => 'Belum ada data yang tersimpan pada periode survey aktif',
+                'message' => 'Belum ada data keluarga yang tersimpan',
                 'survey_aktif' => $survey,
                 'data' => [],
             ], 200);
