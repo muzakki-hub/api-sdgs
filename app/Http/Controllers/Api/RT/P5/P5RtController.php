@@ -7,6 +7,7 @@ use App\Models\RT\P5\RtP5M;
 use Illuminate\Http\Request;
 use App\Models\Survey\Survey;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
 
 class P5RtController extends Controller
 {
@@ -23,7 +24,7 @@ class P5RtController extends Controller
             'jml_pik' => 'nullable|integer',
 
             'ada_tempat_hiburan' => 'required|in:1,2',
-            'jarak_tempat_hiburan' => 'nullable|numeric',
+            'jarak_tempat_hiburan' => 'required_if:ada_tempat_hiburan,2|nullable|integer',
 
             'ada_pangkalan_minyak' => 'required|in:1,2',
             'ada_pangkalan_lpg' => 'required|in:1,2',
@@ -32,20 +33,25 @@ class P5RtController extends Controller
             'jml_kud_tani' => 'nullable|integer',
             'jml_kud_kredit' => 'nullable|integer',
             'jml_kud_lain' => 'nullable|integer',
+
             'jml_kopinkra' => 'nullable|integer',
             'jml_kospin' => 'nullable|integer',
             'jml_koperasi_serbausaha' => 'nullable|integer',
             'jml_koperasi_lain' => 'nullable|integer',
 
-            'kios_kud' => 'nullable|integer',
-            'kios_bumdes' => 'nullable|integer',
-            'kios_lain' => 'nullable|integer',
+            'kios_kud' => 'required|in:1,2',
+            'kios_bumdes' => 'required|in:1,2',
+            'kios_lain' => 'required|in:1,2',
 
             'kur' => 'required|in:1,2',
             'kkpe' => 'required|in:1,2',
             'kuk' => 'required|in:1,2',
             'kube' => 'required|in:1,2',
         ]);
+
+        if ($validated["ada_tempat_hiburan"] == "1") {
+            $validated['jarak_tempat_hiburan'] = null;
+        }
 
         $id = 'RTP5-' . strtotime(now());
 
@@ -62,9 +68,13 @@ class P5RtController extends Controller
             ], 400);
         }
 
+        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
+
         try {
             RtP5M::create(array_merge($validated, [
                 'id'         => $id,
+                'id_buat'    => $userId,
+                'id_update'  => $userId,
                 'tgl_buat'   => now(),
                 'tgl_update' => null,
             ]));
@@ -167,7 +177,10 @@ class P5RtController extends Controller
             ], 400);
         }
 
+        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
+
         $data->update(array_merge($validated, [
+            'id_update'  => $userId,
             'tgl_update' => now(),
         ]));
 

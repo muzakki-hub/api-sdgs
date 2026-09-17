@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\RT\P11\RtP11M;
 use App\Models\Survey\Survey;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
 
 class P11RtController extends Controller
 {
@@ -79,10 +80,13 @@ class P11RtController extends Controller
         ]);
 
         $id = 'RTP11-' . strtotime(now());
+        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
 
         try {
             RtP11M::create(array_merge($validated, [
                 'id'         => $id,
+                'id_buat'    => $userId,
+                'id_update'  => $userId,
                 'tgl_buat'   => now(),
                 'tgl_update' => null,
             ]));
@@ -147,8 +151,11 @@ class P11RtController extends Controller
             'jumlah_lokasi_psk' => 'required|integer',
         ]);
 
+        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
+
         try {
             $data->update(array_merge($validated, [
+                'id_update'  => $userId,
                 'tgl_update' => now(),
             ]));
 

@@ -7,6 +7,7 @@ use App\Models\RT\P7\RtP7M;
 use Illuminate\Http\Request;
 use App\Models\Survey\Survey;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
 
 class P7RtController extends Controller
 {
@@ -92,10 +93,13 @@ class P7RtController extends Controller
         ]);
 
         $id = 'RTP7-' . strtotime(now());
+        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
 
         try {
             RtP7M::create(array_merge($validated, [
                 'id'         => $id,
+                'id_buat'    => $userId,
+                'id_update'  => $userId,
                 'tgl_buat'   => now(),
                 'tgl_update' => null,
             ]));
@@ -174,8 +178,11 @@ class P7RtController extends Controller
         ]);
 
 
+        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
+
         try {
             $data->update(array_merge($validated, [
+                'id_update'  => $userId,
                 'tgl_update' => now(),
             ]));
 

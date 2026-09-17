@@ -9,6 +9,8 @@ use App\Models\Survey\Survey;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 
+use Illuminate\Support\Facades\Auth;
+
 class P2RtController extends Controller
 {
 
@@ -124,9 +126,12 @@ class P2RtController extends Controller
         }
 
         $id = 'RTP2-' . strtotime(now());
+        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
 
         $data = RtP2M::create(array_merge($validated, [
             'id'         => $id,
+            'id_buat'    => $userId,
+            'id_update'  => $userId,
             'tgl_buat'   => now(),
             'tgl_update' => null,
         ]));
@@ -191,9 +196,14 @@ class P2RtController extends Controller
             ], 400);
         }
 
+        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
+
         $data->update(array_merge($validated, [
+            'id_update'  => $userId,
             'tgl_update' => now(),
         ]));
+
+        $idP4 = $validated['id_p4'] ?? $data->id_p4;
 
         app(\App\Services\SurveyProgressService::class)->syncProgress(
             $idP4,

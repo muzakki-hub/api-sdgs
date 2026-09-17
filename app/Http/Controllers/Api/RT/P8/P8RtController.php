@@ -7,6 +7,7 @@ use App\Models\RT\P8\RtP8M;
 use Illuminate\Http\Request;
 use App\Models\Survey\Survey;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
 
 class P8RtController extends Controller
 {
@@ -30,14 +31,14 @@ class P8RtController extends Controller
         if (!$data) {
             return response()->json([
                 'status' => false,
-                'message' => 'Data RT P8 tidak ditemukan',
+                'message' => 'Data tidak ditemukan',
             ], 404);
         }
 
         return response()->json([
             'status' => true,
-            'message' => 'Data RT P8 ditemukan',
-            'data' => $data
+            'message' => 'Data berhasil ditemukan',
+            'data' => $data,
         ]);
     }
 
@@ -61,10 +62,13 @@ class P8RtController extends Controller
         ]);
 
         $id = 'RTP8-' . strtotime(now());
+        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
 
         try {
             RtP8M::create(array_merge($validated, [
                 'id'         => $id,
+                'id_buat'    => $userId,
+                'id_update'  => $userId,
                 'tgl_buat'   => now(),
                 'tgl_update' => null,
             ]));
@@ -110,8 +114,11 @@ class P8RtController extends Controller
 
             'perpustakaan_taman_bacaan'=> 'required|in:1,2',
         ]);
-         try {
+        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
+
+        try {
             $data->update(array_merge($validated, [
+                'id_update'  => $userId,
                 'tgl_update' => now(),
             ]));
 

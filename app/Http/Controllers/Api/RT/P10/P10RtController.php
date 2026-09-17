@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\RT\P10\RtP10M;
 use App\Models\Survey\Survey;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
 
 class P10RtController extends Controller
 {
@@ -87,10 +88,13 @@ class P10RtController extends Controller
         ]);
 
         $id = 'RTP10-' . strtotime(now());
+        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
 
         try {
             RtP10M::create(array_merge($validated, [
                 'id'         => $id,
+                'id_buat'    => $userId,
+                'id_update'  => $userId,
                 'tgl_buat'   => now(),
                 'tgl_update' => null,
             ]));
@@ -163,8 +167,11 @@ class P10RtController extends Controller
             'kearifan_kematian' => 'nullable|string',
         ]);
 
+        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
+
         try {
             $data->update(array_merge($validated, [
+                'id_update'  => $userId,
                 'tgl_update' => now(),
             ]));
 
