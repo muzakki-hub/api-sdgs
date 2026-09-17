@@ -60,7 +60,13 @@ class P6RtController extends Controller
         ]);
 
         $id = 'RTP6-' . strtotime(now());
-        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
+        $userId = Auth::id() ?? $request->user()?->id;
+        if (!$userId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Sesi tidak valid atau pengguna belum login.',
+            ], 401);
+        }
 
         try {
             RtP6M::create(array_merge($validated, [
@@ -171,7 +177,13 @@ class P6RtController extends Controller
             'jml_lapas' => 'nullable|integer',
         ]);
 
-        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
+        $userId = Auth::id() ?? $request->user()?->id;
+        if (!$userId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Sesi tidak valid atau pengguna belum login.',
+            ], 401);
+        }
 
         try {
             $data->update(array_merge($validated, [

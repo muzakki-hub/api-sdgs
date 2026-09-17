@@ -88,7 +88,13 @@ class P10RtController extends Controller
         ]);
 
         $id = 'RTP10-' . strtotime(now());
-        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
+        $userId = Auth::id() ?? $request->user()?->id;
+        if (!$userId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Sesi tidak valid atau pengguna belum login.',
+            ], 401);
+        }
 
         try {
             RtP10M::create(array_merge($validated, [
@@ -167,7 +173,13 @@ class P10RtController extends Controller
             'kearifan_kematian' => 'nullable|string',
         ]);
 
-        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
+        $userId = Auth::id() ?? $request->user()?->id;
+        if (!$userId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Sesi tidak valid atau pengguna belum login.',
+            ], 401);
+        }
 
         try {
             $data->update(array_merge($validated, [

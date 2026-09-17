@@ -166,7 +166,7 @@ Route::group([
     Route::get('/formulir-individu/{id}/download', [FormulirIdvController::class, 'download']);
 
 });
-Route::prefix('rt')->group(function () {
+Route::prefix('rt')->middleware('auth:sanctum')->group(function () {
 
     Route::post('/p2', [P2RtController::class, 'store']);
     Route::get('/p2/{id_p3_rw}', [P2RtController::class, 'index']);

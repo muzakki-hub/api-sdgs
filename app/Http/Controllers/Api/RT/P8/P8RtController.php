@@ -62,7 +62,13 @@ class P8RtController extends Controller
         ]);
 
         $id = 'RTP8-' . strtotime(now());
-        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
+        $userId = Auth::id() ?? $request->user()?->id;
+        if (!$userId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Sesi tidak valid atau pengguna belum login.',
+            ], 401);
+        }
 
         try {
             RtP8M::create(array_merge($validated, [
@@ -114,7 +120,13 @@ class P8RtController extends Controller
 
             'perpustakaan_taman_bacaan'=> 'required|in:1,2',
         ]);
-        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
+        $userId = Auth::id() ?? $request->user()?->id;
+        if (!$userId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Sesi tidak valid atau pengguna belum login.',
+            ], 401);
+        }
 
         try {
             $data->update(array_merge($validated, [

@@ -126,7 +126,13 @@ class P2RtController extends Controller
         }
 
         $id = 'RTP2-' . strtotime(now());
-        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
+        $userId = Auth::id() ?? $request->user()?->id;
+        if (!$userId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Sesi tidak valid atau pengguna belum login.',
+            ], 401);
+        }
 
         $data = RtP2M::create(array_merge($validated, [
             'id'         => $id,
@@ -196,7 +202,13 @@ class P2RtController extends Controller
             ], 400);
         }
 
-        $userId = Auth::id() ?? $request->user()?->id ?? '1750899536';
+        $userId = Auth::id() ?? $request->user()?->id;
+        if (!$userId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Sesi tidak valid atau pengguna belum login.',
+            ], 401);
+        }
 
         $data->update(array_merge($validated, [
             'id_update'  => $userId,
