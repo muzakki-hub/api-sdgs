@@ -23,14 +23,59 @@ class P2Api extends Controller
             ->whereDate('tgl_akhir', '>=', $today)
             ->first();
 
-        // Ambil semua data lokasi keluarga (P2)
-        $data = P2::with('survey')->get();
+        if (!$survey) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Belum ada data yang tersimpan pada periode survey aktif',
+                'survey_aktif' => null,
+                'data' => [],
+            ], 200);
+        }
+
+        // Ambil data lokasi keluarga (P2) hanya pada periode survei aktif
+        $data = P2::with('survey')
+            ->where('id_survey', $survey->id)
+            ->orderBy('tgl_buat', 'desc')
+            ->get();
+
+        if ($data->isEmpty()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Belum ada data yang tersimpan pada periode survey aktif',
+                'survey_aktif' => $survey,
+                'data' => [],
+            ], 200);
+        }
+
+        // Enrich nama wilayah jika tersedia
+        $kodes = [];
+        foreach ($data as $item) {
+            if ($item->kode_provinsi) $kodes[] = $item->kode_provinsi;
+            if ($item->kode_kabupaten) $kodes[] = $item->kode_kabupaten;
+            if ($item->kode_kecamatan) $kodes[] = $item->kode_kecamatan;
+            if ($item->kode_desa) $kodes[] = $item->kode_desa;
+        }
+        $kodes = array_unique($kodes);
+
+        if (!empty($kodes)) {
+            $wilayah = \Illuminate\Support\Facades\DB::table('wilayah')
+                ->whereIn('kode', $kodes)
+                ->get();
+
+            $data->transform(function ($item) use ($wilayah) {
+                $item->nama_provinsi = $wilayah->firstWhere('kode', $item->kode_provinsi)?->nama;
+                $item->nama_kabupaten = $wilayah->firstWhere('kode', $item->kode_kabupaten)?->nama;
+                $item->nama_kecamatan = $wilayah->firstWhere('kode', $item->kode_kecamatan)?->nama;
+                $item->nama_desa = $wilayah->firstWhere('kode', $item->kode_desa)?->nama;
+                return $item;
+            });
+        }
 
         return response()->json([
             'status' => true,
             'survey_aktif' => $survey,
-            'data' => $data
-        ]);
+            'data' => $data,
+        ], 200);
     }
 
     /**
@@ -45,18 +90,28 @@ class P2Api extends Controller
             ->first();
 
         if (!$survey) {
-            return back()->with('error', 'Tidak ada survey aktif untuk hari ini.');
+            return response()->json([
+                'status' => false,
+                'message' => 'Saat ini tidak memasuki periode survei manapun',
+            ], 400);
+        }
+
+        $existing = P2::where('no_kk', $request->no_kk)
+            ->where('id_survey', $survey->id)
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Nomor KK ini sudah terdaftar pada periode survei ini',
+            ], 409);
         }
 
         $data = P2::create([
             'id' => "KGP2-" . strtotime(date("Y-m-d H:i:s")),
             'id_survey' => $survey->id,
             'no_kk' => $request->no_kk,
-            'no_kk' => $request->no_kk,
             'nik_kk' => $request->nik_kk,
-            // 'kode_provinsi' => $validated['kode_provinsi'],
-            // 'kode_kabupaten' => $validated['kode_kabupaten'],
-            // 'kode_kecamatan' => $validated['kode_kecamatan'],
             'kode_provinsi' => $request->kode_provinsi,
             'kode_kabupaten' => $request->kode_kabupaten,
             'kode_kecamatan' => $request->kode_kecamatan,
