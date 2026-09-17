@@ -58,25 +58,41 @@ class SurveyProgressService
             if ($records->isEmpty()) {
                 return SurveyProgress::updateOrCreate(
                     ['id_parent' => $idParent, 'form_code' => $formCode, 'id_survey' => $idSurvey],
-                    ['skor_wajib' => 0, 'skor_total' => 0]
+                    ['skor_wajib' => 0, 'skor_total' => 0, 'status_verifikasi' => 'belum_diisi']
                 );
             }
 
-            // Jika record ada, artinya form berhasil disubmit (lolos filter required) => skor_wajib = 100
-            $skorWajib = 100;
-            $skorTotal = $this->calculateCompleteness($records, $table, $options);
+            $hasColumnVerified = Schema::hasColumn($table, 'is_verified');
+            $verifiedCount = $hasColumnVerified ? $records->where('is_verified', 1)->count() : $records->count();
+            $totalCount = $records->count();
+
+            if ($hasColumnVerified && $verifiedCount === 0) {
+                // Seluruh data berasal dari hasil tarik dan belum diverifikasi
+                $skorWajib = 0;
+                $skorTotal = 0;
+                $statusVerifikasi = 'draft_tarik';
+            } elseif ($hasColumnVerified && $verifiedCount < $totalCount) {
+                // Sebagian sudah diverifikasi (pada multi-record)
+                $skorWajib = (int) round(($verifiedCount / $totalCount) * 100);
+                $skorTotal = $this->calculateCompleteness($records->where('is_verified', 1), $table, $options);
+                $statusVerifikasi = 'sebagian_terverifikasi';
+            } else {
+                // Terverifikasi penuh
+                $skorWajib = 100;
+                $skorTotal = $this->calculateCompleteness($records, $table, $options);
+                $statusVerifikasi = 'terverifikasi';
+            }
 
             return SurveyProgress::updateOrCreate(
                 ['id_parent' => $idParent, 'form_code' => $formCode, 'id_survey' => $idSurvey],
-                ['skor_wajib' => $skorWajib, 'skor_total' => $skorTotal]
+                ['skor_wajib' => $skorWajib, 'skor_total' => $skorTotal, 'status_verifikasi' => $statusVerifikasi]
             );
         } catch (\Throwable $e) {
             Log::error("Gagal sinkron progress [{$formCode}] untuk parent [{$idParent}]: " . $e->getMessage());
             
-            // Fallback aman agar tidak menggagalkan flow utama
             return SurveyProgress::updateOrCreate(
                 ['id_parent' => $idParent, 'form_code' => $formCode, 'id_survey' => $idSurvey],
-                ['skor_wajib' => 0, 'skor_total' => 0]
+                ['skor_wajib' => 0, 'skor_total' => 0, 'status_verifikasi' => 'belum_diisi']
             );
         }
     }
@@ -205,9 +221,9 @@ class SurveyProgressService
             if (!$hasRecord) {
                 // Self-healing: jika record fisik terhapus/belum ada di survei ini, pastikan cache survey_progress di-reset ke 0
                 if ($cached && ($cached->skor_wajib > 0 || $cached->skor_total > 0)) {
-                    $cached->update(['skor_wajib' => 0, 'skor_total' => 0]);
+                    $cached->update(['skor_wajib' => 0, 'skor_total' => 0, 'status_verifikasi' => 'belum_diisi']);
                 }
-                return ['skor_wajib' => 0, 'skor_total' => 0];
+                return ['skor_wajib' => 0, 'skor_total' => 0, 'status_verifikasi' => 'belum_diisi'];
             }
 
             // Jika record fisik ada dan sudah di-cache sebagai selesai, gunakan nilai cache
@@ -215,6 +231,7 @@ class SurveyProgressService
                 return [
                     'skor_wajib' => (int) $cached->skor_wajib,
                     'skor_total' => (int) $cached->skor_total,
+                    'status_verifikasi' => $cached->status_verifikasi ?? 'terverifikasi',
                 ];
             }
 
@@ -223,12 +240,14 @@ class SurveyProgressService
             return [
                 'skor_wajib' => (int) $synced->skor_wajib,
                 'skor_total' => (int) $synced->skor_total,
+                'status_verifikasi' => $synced->status_verifikasi ?? ($synced->skor_wajib == 100 ? 'terverifikasi' : 'belum_diisi'),
             ];
         } catch (\Throwable $e) {
             Log::error("Error getOrSyncProgress [{$formCode}] parent [{$idParent}]: " . $e->getMessage());
             return [
                 'skor_wajib' => (int) ($cached->skor_wajib ?? 0),
                 'skor_total' => (int) ($cached->skor_total ?? 0),
+                'status_verifikasi' => $cached->status_verifikasi ?? 'belum_diisi',
             ];
         }
     }

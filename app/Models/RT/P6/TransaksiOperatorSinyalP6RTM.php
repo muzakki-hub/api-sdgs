@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class TransaksiOperatorSinyalP6RTM extends Model
 {
+    use \App\Models\Traits\HasSurveyVerification;
+
      use HasFactory;
 
     protected $table = 'transaksi_operator_sinyal_p6_rt';
@@ -16,6 +18,7 @@ class TransaksiOperatorSinyalP6RTM extends Model
     public $timestamps = false;
 
     protected $fillable = [
+        'is_verified',
         'id',
         'id_survey',
         'id_p4',

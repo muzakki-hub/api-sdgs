@@ -7,12 +7,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class TransaksiPerkelahianP11RTM extends Model
 {
+    use \App\Models\Traits\HasSurveyVerification;
+
     protected $table = 'transaksi_perkelahian_p11_rt';
     protected $primaryKey = 'id';
     public $incrementing = false;
     public $timestamps = false;
 
     protected $fillable = [
+        'is_verified',
         'id',
         'id_survey',
         'id_master_perkelahian',

@@ -60,12 +60,14 @@ class RtprogressController extends Controller
             );
 
             $result[] = [
-                'option'      => $opt['option'],
-                'description' => $opt['description'],
-                'select'      => $opt['select'],
-                'skor_wajib'  => $scores['skor_wajib'],
-                'skor_total'  => $scores['skor_total'],
-                'total_skor'  => $scores['skor_total'], // backward compatibility untuk frontend
+                'option'            => $opt['option'],
+                'description'       => $opt['description'],
+                'select'            => $opt['select'],
+                'skor_wajib'        => $scores['skor_wajib'],
+                'skor_total'        => $scores['skor_total'],
+                'total_skor'        => $scores['skor_total'], // backward compatibility untuk frontend
+                'status_verifikasi' => $scores['status_verifikasi'] ?? 'belum_diisi',
+                'is_verified'       => ($scores['status_verifikasi'] ?? '') === 'terverifikasi' ? 1 : 0,
             ];
         }
 

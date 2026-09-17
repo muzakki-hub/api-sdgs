@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class TransaksiPendidikanP8RTM extends Model
 {
+    use \App\Models\Traits\HasSurveyVerification;
+
 
     protected $table = 'transaksi_pendidikan_p8_rt';
     protected $primaryKey = 'id';
@@ -15,6 +17,7 @@ class TransaksiPendidikanP8RTM extends Model
     public $timestamps = false;
 
     protected $fillable = [
+        'is_verified',
         'id',
         'id_survey',
         'id_master_pendidikan',

@@ -7,12 +7,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class TransaksiLembagaMasyarakatP10RTM extends Model
 {
+    use \App\Models\Traits\HasSurveyVerification;
+
     protected $table = 'transaksi_lembaga_masyarakat_p10_rt';
     protected $primaryKey = 'id';
     public $incrementing = false;
     public $timestamps = false;
 
     protected $fillable = [
+        'is_verified',
         'id',
         'id_survey',
         'id_master_lembaga_masyarakat',

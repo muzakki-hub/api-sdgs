@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class RtP7M extends Model
 {
+    use \App\Models\Traits\HasSurveyVerification;
+
 
       use HasFactory;
 
@@ -16,6 +18,7 @@ class RtP7M extends Model
     public $timestamps = false;
 
     protected $fillable = [
+        'is_verified',
         'id',
         'id_survey',
         'id_p4',

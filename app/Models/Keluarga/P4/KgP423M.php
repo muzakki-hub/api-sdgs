@@ -6,12 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class KgP423M extends Model
 {
+    use \App\Models\Traits\HasSurveyVerification;
+
     protected $table = 'kg_p423';
     protected $primaryKey = 'id';
     public $incrementing = false;
     public $timestamps = false;
 
     protected $fillable = [
+        'is_verified',
         'id',
         'id_kg_p2',
         'id_master_tenkes',

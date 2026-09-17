@@ -6,11 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 
 class RtP2M extends Model
 {
+    use \App\Models\Traits\HasSurveyVerification;
+
     public $timestamps = false;
     protected $table = 'rt_p2';
     public $incrementing = false;
 
     protected $fillable = [
+        'is_verified',
         'id',
         'id_survey',
         'rt',

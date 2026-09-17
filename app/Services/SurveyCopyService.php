@@ -90,6 +90,7 @@ class SurveyCopyService
                     $data = (array) $prevRow;
                     $data['id'] = $cfg['prefix'] . '-' . strtotime(now()) . rand(100, 999);
                     $data['id_survey'] = $activeSurvey->id;
+                    $data['is_verified'] = 0;
                     $data['id_buat'] = $userId;
                     $data['id_update'] = $userId;
                     $data['tgl_buat'] = $now;
@@ -114,6 +115,7 @@ class SurveyCopyService
                     $data = (array) $prevRow;
                     $data['id'] = $cfg['prefix'] . '-' . strtotime(now()) . rand(100, 999);
                     $data['id_survey'] = $activeSurvey->id;
+                    $data['is_verified'] = 0;
                     $data['id_buat'] = $userId;
                     $data['id_update'] = $userId;
                     $data['tgl_buat'] = $now;
@@ -175,6 +177,7 @@ class SurveyCopyService
                     $d = (array) $prevP3;
                     $d['id'] = 'KG-' . strtotime(now()) . rand(100, 999);
                     $d['id_survey'] = $activeSurvey->id;
+                    $d['is_verified'] = 0;
                     $d['id_buat'] = $userId;
                     $d['id_update'] = $userId;
                     $d['tgl_buat'] = $now;
@@ -191,6 +194,7 @@ class SurveyCopyService
                     $d = (array) $prevP4;
                     $d['id'] = 'KGP4-' . strtotime(now()) . rand(100, 999);
                     $d['id_survey'] = $activeSurvey->id;
+                    $d['is_verified'] = 0;
                     $d['id_buat'] = $userId;
                     $d['id_update'] = $userId;
                     $d['tgl_buat'] = $now;
@@ -218,6 +222,7 @@ class SurveyCopyService
                     $d = (array) $prevRow;
                     $d['id'] = substr($cfg['prefix'] . md5($idP2 . $masterVal . $activeSurvey->id), 0, 25);
                     $d['id_survey'] = $activeSurvey->id;
+                    $d['is_verified'] = 0;
                     $d['id_buat'] = $userId;
                     $d['id_update'] = $userId;
                     $d['tgl_buat'] = $now;
