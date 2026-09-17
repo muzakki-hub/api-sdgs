@@ -14,6 +14,7 @@ class SurveyProgress extends Model
         'id_survey',
         'skor_wajib',
         'skor_total',
+        'status_verifikasi',
     ];
 
     protected $casts = [
