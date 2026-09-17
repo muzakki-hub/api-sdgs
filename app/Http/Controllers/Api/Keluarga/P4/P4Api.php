@@ -20,13 +20,25 @@ class P4Api extends Controller
         try {
             $data = KgP4M::where('id_kg_p2', $id)->first();
 
+            if (!$data) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Data P4 tidak ditemukan',
+                    'data' => null
+                ], 404);
+            }
+
             return response()->json([
                 'status' => true,
                 'message' => 'Data P4 berdasarkan id_kg_p2',
                 'data' => $data
-            ]);
+            ], 200);
         } catch (Throwable $e) {
             Log::error("[P4 INDEX] " . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'Terjadi kesalahan server'
+            ], 500);
         }
     }
 
@@ -159,6 +171,13 @@ class P4Api extends Controller
 
             DB::commit();
 
+            app(\App\Services\SurveyProgressService::class)->syncProgress(
+                $request->id_kg_p2,
+                'P4',
+                'kg_p4',
+                'id_kg_p2'
+            );
+
             return response()->json([
                 'status' => true,
                 'message' => 'Data berhasil ditambahkan.',
@@ -208,13 +227,14 @@ class P4Api extends Controller
         DB::beginTransaction();
 
         try {
-            $data = KgP4M::find($id);
+            $data = KgP4M::where('id', $id)
+                ->orWhere('id_kg_p2', $id)
+                ->orWhere('id_kg_p2', $request->id_kg_p2)
+                ->first();
 
             if (!$data) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data tidak ditemukan.'
-                ], 404);
+                DB::rollBack();
+                return $this->store($request);
             }
 
             // Sync meteran fields to kg_p2 if provided and relation exists
@@ -278,6 +298,13 @@ class P4Api extends Controller
 
             DB::commit();
 
+            app(\App\Services\SurveyProgressService::class)->syncProgress(
+                $data->id_kg_p2,
+                'P4',
+                'kg_p4',
+                'id_kg_p2'
+            );
+
             return response()->json([
                 'status' => true,
                 'message' => 'Data berhasil diperbarui.',
@@ -298,16 +325,15 @@ class P4Api extends Controller
     public function destroy($id)
     {
         try {
-            $data = KgP4M::find($id);
+            $data = KgP4M::where('id', $id)->orWhere('id_kg_p2', $id)->first();
 
-            if (!$data) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Data tidak ditemukan.'
-                ], 404);
+            $idKgP2 = $data ? $data->id_kg_p2 : $id;
+
+            if ($data) {
+                $data->delete();
             }
 
-            $data->delete();
+            app(\App\Services\SurveyProgressService::class)->recordDelete($idKgP2, 'P4');
 
             return response()->json([
                 'status' => true,

@@ -131,6 +131,13 @@ class P2RtController extends Controller
             'tgl_update' => null,
         ]));
 
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $validated['id_p4'],
+            'P2',
+            'rt_p2',
+            'id_p4'
+        );
+
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil disimpan',
@@ -188,6 +195,13 @@ class P2RtController extends Controller
             'tgl_update' => now(),
         ]));
 
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $idP4,
+            'P2',
+            'rt_p2',
+            'id_p4'
+        );
+
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil diperbarui',
@@ -197,16 +211,16 @@ class P2RtController extends Controller
 
     public function destroy(string $idP4)
     {
-        $data = RtP2M::where('id_p4', $idP4)->first();
+        $deleted = RtP2M::where('id_p4', $idP4)->delete();
 
-        if (!$data) {
+        if ($deleted === 0) {
             return response()->json([
                 'status' => false,
                 'message' => 'Data yang akan di hapus tidak ditemukan',
             ], 404);
         }
 
-        $data->delete();
+        app(\App\Services\SurveyProgressService::class)->recordDelete($idP4, 'P2');
 
         return response()->json([
             'status' => true,

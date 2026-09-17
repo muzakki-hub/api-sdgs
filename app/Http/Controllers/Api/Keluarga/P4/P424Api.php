@@ -5,220 +5,174 @@ namespace App\Http\Controllers\Api\Keluarga\P4;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Keluarga\P4\KgP424M;
-use Illuminate\Support\Facades\Log;
 use App\Models\Keluarga\P2\KgP2M;
+use App\Services\SurveyProgressService;
 use Illuminate\Support\Facades\Auth;
-use Throwable;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class P424Api extends Controller
 {
+    public const SARPRAS_MAP = [
+        'A001' => '1',
+        'A002' => '2',
+        'A003' => '3',
+        'A004' => '4',
+        'A005' => '5',
+        'A006' => '6',
+    ];
 
     public function showByIdP2($id)
     {
-        $data = KgP424M::where('id_kg_p2', $id)->get();
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Data keluarga berdasarkan ID P2',
-            'data' => $data
-        ]);
-    }
-
-    // GET LIST DATA
-    public function index(Request $request)
-    {
         try {
-            $idKgP2 = $request->id_kg_p2;
+            $rows = KgP424M::where('id_kg_p2', $id)->get();
 
-            if (!$idKgP2) {
+            if ($rows->isEmpty()) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'Parameter id_kg_p2 diperlukan.'
-                ], 400);
+                    'message' => 'Data P424 belum ada',
+                    'data' => null,
+                ], 404);
             }
 
-            $data = KgP424M::with('masterApst')
-                ->where('id_kg_p2', $idKgP2)
-                ->get();
+            $flat = [
+                'id' => $id,
+                'id_kg_p2' => $id,
+            ];
+
+            foreach ($rows as $row) {
+                $suffix = self::SARPRAS_MAP[$row->id_master_akses_sarpras] ?? null;
+                if ($suffix) {
+                    $flat["jenis_transportasi_{$suffix}"] = $row->jenis_transportasi;
+                    $flat["penggunaan_transportasi_{$suffix}"] = $row->penggunaan_transportasi;
+                    $flat["waktu_tempuh_{$suffix}"] = $row->waktu_tempuh;
+                    $flat["biaya_sekali_{$suffix}"] = $row->biaya_sekali;
+                    $flat["kemudahan_{$suffix}"] = $row->kemudahan;
+                }
+            }
 
             return response()->json([
                 'status' => true,
-                'message' => 'Data ditemukan.',
-                'data' => $data
+                'message' => 'Data P424 ditemukan',
+                'data' => $flat,
             ], 200);
         } catch (\Throwable $e) {
-            Log::error('[P4-424-INDEX] ' . $e->getMessage());
-
+            Log::error("[P424 SHOW] " . $e->getMessage());
             return response()->json([
                 'status' => false,
-                'message' => 'Terjadi kesalahan server.'
+                'message' => 'Terjadi kesalahan server',
             ], 500);
         }
     }
 
-    // CREATE DATA
-    public function store(Request $request)
-{
-    // Ambil seluruh payload
-    $payload = $request->items ?? [];
-
-    // Jika payload 1 object (associative), bungkus jadi array
-    if (!is_array($payload)) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Payload harus berupa array objek.'
-        ], 422);
-    }
-    if ($payload === [] || array_keys($payload) !== range(0, count($payload) - 1)) {
-        $payload = [$payload];
+    public function index(Request $request)
+    {
+        return $this->showByIdP2($request->id_kg_p2);
     }
 
-    // Validasi array item per item
-    $validator = Validator::make(
-        ['data' => $payload],
-        [
-            'data.*.id_kg_p2' => 'required|string',
-            'data.*.id_master_akses_sarpras' => 'required|integer',
-            'data.*.jenis_transportasi' => 'nullable',
-            'data.*.penggunaan_transportasi' => 'nullable',
-            'data.*.biaya_sekali' => 'nullable',
-            'data.*.waktu_tempuh' => 'nullable',
-            'data.*.kemudahan' => 'nullable',
-        ]
-    );
-
-    if ($validator->fails()) {
-        return response()->json([
-            'status' => false,
-            'message' => 'Validasi gagal.',
-            'errors' => $validator->errors()
-        ], 422);
-    }
-
-    DB::beginTransaction();
-
-    try {
-        $created = [];
-
-        foreach ($payload as $item) {
-
-            $datap2 = KgP2M::find($item['id_kg_p2']);
-            if (!$datap2) {
-                DB::rollBack();
-                return response()->json([
-                    'status' => false,
-                    'message' => "id_kg_p2 tidak ditemukan: {$item['id_kg_p2']}"
-                ], 404);
-            }
-
-            // Generate ID super unik
-            $generatedId = "KGP424-" . str_replace('.', '', microtime(true)) . rand(10, 99);
-
-            $row = KgP424M::create([
-                'id' => $generatedId,
-                'id_buat' => Auth::id() ?? null,
-                'id_survey' => $datap2->id_survey,
-                'tgl_buat' => now(),
-                'tgl_update' => now(),
-                'id_kg_p2' => $item['id_kg_p2'],
-
-                'id_master_akses_sarpras' => $item['id_master_akses_sarpras'],
-                'jenis_transportasi' => $item['jenis_transportasi'] ?? null,
-                'penggunaan_transportasi' => $item['penggunaan_transportasi'] ?? null,
-                'biaya_sekali' => $item['biaya_sekali'] ?? null,
-                'waktu_tempuh' => $item['waktu_tempuh'] ?? null,
-                'kemudahan' => $item['kemudahan'] ?? null,
-            ]);
-
-            $created[] = $row;
-        }
-
-        DB::commit();
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Data berhasil ditambahkan.',
-            'data' => $created
-        ], 201);
-
-    } catch (\Throwable $e) {
-        DB::rollBack();
-        Log::error("[P424 STORE ARRAY] " . $e->getMessage());
-        
-        return response()->json([
-            'status' => false,
-            'message' => 'Terjadi kesalahan server.'
-        ], 500);
-    }
-}
-
-
-    // SHOW DETAIL
     public function show($id)
     {
-        $data = KgP424M::with('masterApst')->find($id);
-
-        if (!$data) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Data tidak ditemukan.'
-            ], 404);
-        }
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Detail data ditemukan.',
-            'data' => $data
-        ], 200);
+        return $this->showByIdP2($id);
     }
 
-    // UPDATE DATA
+    public function store(Request $request)
+    {
+        $idKgP2 = $request->id_kg_p2;
+        if (!$idKgP2) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Parameter id_kg_p2 diperlukan.',
+            ], 400);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $userId = Auth::id() ?? 'SYSTEM';
+            $datap2 = KgP2M::find($idKgP2);
+            $idSurvey = $datap2 ? $datap2->id_survey : null;
+            $now = now();
+
+            foreach (self::SARPRAS_MAP as $idMaster => $suffix) {
+                $uniqueId = substr('424_' . md5($idKgP2 . $idMaster), 0, 25);
+                $jenisTrans = $request->input("jenis_transportasi_{$suffix}") ?: '1';
+                $gunaTrans = $request->input("penggunaan_transportasi_{$suffix}") ?: '1';
+                $kemudahan = $request->input("kemudahan_{$suffix}") ?: '1';
+
+                KgP424M::updateOrCreate(
+                    [
+                        'id_kg_p2' => $idKgP2,
+                        'id_master_akses_sarpras' => $idMaster,
+                    ],
+                    [
+                        'id' => $uniqueId,
+                        'id_buat' => $userId,
+                        'id_survey' => $idSurvey,
+                        'tgl_buat' => $now,
+                        'tgl_update' => $now,
+                        'jenis_transportasi' => $jenisTrans,
+                        'penggunaan_transportasi' => $gunaTrans,
+                        'waktu_tempuh' => $request->input("waktu_tempuh_{$suffix}"),
+                        'biaya_sekali' => $request->input("biaya_sekali_{$suffix}"),
+                        'kemudahan' => $kemudahan,
+                    ]
+                );
+            }
+
+            DB::commit();
+
+            app(SurveyProgressService::class)->syncProgress(
+                $idKgP2,
+                'P4.24',
+                'kg_p424',
+                'id_kg_p2'
+            );
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Data P424 berhasil disimpan.',
+                'data' => ['id_kg_p2' => $idKgP2],
+            ], 200);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error("[P424 STORE] " . $e->getMessage());
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Gagal menyimpan data: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function update(Request $request, $id)
     {
-        $data = KgP424M::find($id);
-
-        if (!$data) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Data tidak ditemukan.'
-            ], 404);
-        }
-
-        $data->update(array_merge(
-            $request->all(),
-            [
-                'id_update' => Auth::id(),
-                'tgl_update' => Carbon::now(),
-            ]
-        ));
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Data berhasil diperbarui.',
-            'data' => $data
-        ], 200);
+        $request->merge(['id_kg_p2' => $request->id_kg_p2 ?? $id]);
+        return $this->store($request);
     }
 
-    // DELETE DATA
     public function destroy($id)
     {
-        $data = KgP424M::find($id);
+        DB::beginTransaction();
 
-        if (!$data) {
+        try {
+            KgP424M::where('id_kg_p2', $id)->orWhere('id', $id)->delete();
+
+            DB::commit();
+
+            app(SurveyProgressService::class)->recordDelete($id, 'P4.24');
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Data P424 berhasil dihapus.',
+            ], 200);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error("[P424 DELETE] " . $e->getMessage());
+
             return response()->json([
                 'status' => false,
-                'message' => 'Data tidak ditemukan.'
-            ], 404);
+                'message' => 'Gagal menghapus data.',
+            ], 500);
         }
-
-        $data->delete();
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Data berhasil dihapus.'
-        ], 200);
     }
 }

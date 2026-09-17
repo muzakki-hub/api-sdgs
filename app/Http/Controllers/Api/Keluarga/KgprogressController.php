@@ -3,11 +3,18 @@
 namespace App\Http\Controllers\Api\Keluarga;
 
 use App\Http\Controllers\Controller;
+use App\Services\SurveyProgressService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class KgprogressController extends Controller
 {
+    protected SurveyProgressService $progressService;
+
+    public function __construct(SurveyProgressService $progressService)
+    {
+        $this->progressService = $progressService;
+    }
+
     /**
      * Hitung progress survei keluarga berdasarkan id_kg_p2
      * Mengembalikan status penyelesaian 5 instrumen kuesioner keluarga:
@@ -25,66 +32,57 @@ class KgprogressController extends Controller
                 'description' => 'Deskripsi Permukiman',
                 'select'      => false,
                 'table'       => 'kg_p4',
-                'total_field' => 27,
             ],
             [
                 'option'      => 'P4.21',
                 'description' => 'Akses Fasilitas Pendidikan',
                 'select'      => true,
                 'table'       => 'kg_p421',
-                'total_field' => 9,
             ],
             [
                 'option'      => 'P4.22',
                 'description' => 'Akses Fasilitas Kesehatan',
                 'select'      => true,
                 'table'       => 'kg_p422',
-                'total_field' => 10,
             ],
             [
                 'option'      => 'P4.23',
                 'description' => 'Akses Tenaga Medis',
                 'select'      => true,
                 'table'       => 'kg_p423',
-                'total_field' => 5,
             ],
             [
                 'option'      => 'P4.24',
                 'description' => 'Akses Sarana Prasarana',
                 'select'      => true,
                 'table'       => 'kg_p424',
-                'total_field' => 6,
             ],
         ];
+
+        // 1 query cepat ke tabel survey_progress
+        $progressMap = $this->progressService->getProgressMap($idP2);
 
         $result = [];
 
         foreach ($options as $opt) {
-            $table = $opt['table'];
-            $skor = 0;
+            $codeKey = strtoupper($opt['option']);
+            $cached = $progressMap->get($codeKey);
 
-            $records = DB::table($table)->where('id_kg_p2', $idP2)->get();
-
-            if ($records->isNotEmpty()) {
-                $totalFilled = 0;
-                foreach ($records as $record) {
-                    $totalFilled += $this->countFilledFields((array) $record);
-                }
-
-                $totalExpected = $records->count() * $opt['total_field'];
-                if ($totalExpected > 0) {
-                    $persen = round(($totalFilled / $totalExpected) * 100);
-                    $skor = min(100, $persen);
-                } else {
-                    $skor = 100;
-                }
-            }
+            $scores = $this->progressService->getOrSyncProgress(
+                $idP2,
+                $opt['option'],
+                $opt['table'],
+                'id_kg_p2',
+                $cached
+            );
 
             $result[] = [
                 'option'      => $opt['option'],
                 'description' => $opt['description'],
                 'select'      => $opt['select'],
-                'total_skor'  => $skor,
+                'skor_wajib'  => $scores['skor_wajib'],
+                'skor_total'  => $scores['skor_total'],
+                'total_skor'  => $scores['skor_total'], // backward compatibility untuk frontend
             ];
         }
 
@@ -92,26 +90,5 @@ class KgprogressController extends Controller
             'status' => true,
             'data'   => $result,
         ]);
-    }
-
-    /**
-     * Hitung jumlah field yang terisi (tidak null, tidak kosong)
-     */
-    private function countFilledFields(array $row): int
-    {
-        $excludedKeys = ['id', 'id_kg_p2', 'id_survey', 'id_buat', 'id_update', 'tgl_buat', 'tgl_update'];
-        $count = 0;
-
-        foreach ($row as $key => $val) {
-            if (in_array($key, $excludedKeys, true)) {
-                continue;
-            }
-
-            if ($val !== null && $val !== '' && $val !== 0 && $val !== '0') {
-                $count++;
-            }
-        }
-
-        return $count;
     }
 }
