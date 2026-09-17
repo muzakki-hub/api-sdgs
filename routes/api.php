@@ -177,6 +177,7 @@ Route::prefix('rt')->middleware('auth:sanctum')->group(function () {
     Route::post('/p3', [P3RtController::class, 'store']);
     Route::get('/p3', [P3RtController::class, 'index']);
     Route::get('/p3/{id}', [P3RtController::class, 'show']);
+    Route::get('/p3/update/{id}', [P3RtController::class, 'show']);
     Route::post('/p3/update/{id}', [P3RtController::class, 'update']);
     Route::delete('/p3/{id}', [P3RtController::class, 'destroy']);
 
