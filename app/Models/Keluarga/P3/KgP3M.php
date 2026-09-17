@@ -16,6 +16,7 @@ class KgP3M extends Model
         'id_kg_p2',
         'no_kk',
         'nik_kk',
+        'id_survey',
         'id_buat',
         'id_update',
         'tgl_buat',

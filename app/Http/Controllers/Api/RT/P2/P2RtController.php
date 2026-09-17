@@ -136,6 +136,7 @@ class P2RtController extends Controller
 
         $data = RtP2M::create(array_merge($validated, [
             'id'         => $id,
+            'id_survey'  => $survey->id,
             'id_buat'    => $userId,
             'id_update'  => $userId,
             'tgl_buat'   => now(),
@@ -146,7 +147,9 @@ class P2RtController extends Controller
             $validated['id_p4'],
             'P2',
             'rt_p2',
-            'id_p4'
+            'id_p4',
+            [],
+            $survey->id
         );
 
         return response()->json([
@@ -162,7 +165,12 @@ class P2RtController extends Controller
 
     public function show(string $idP4)
     {
-        $data = RtP2M::where('id_p4', $idP4)->first();
+        $survey = \App\Services\SurveyProgressService::getActiveSurvey();
+        $query = RtP2M::where('id_p4', $idP4);
+        if ($survey) {
+            $query->where('id_survey', $survey->id);
+        }
+        $data = $query->first();
         if (!$data) {
             return response()->json([
                 'status' => false,
@@ -233,7 +241,12 @@ class P2RtController extends Controller
 
     public function destroy(string $idP4)
     {
-        $deleted = RtP2M::where('id_p4', $idP4)->delete();
+        $survey = \App\Services\SurveyProgressService::getActiveSurvey();
+        $query = RtP2M::where('id_p4', $idP4);
+        if ($survey) {
+            $query->where('id_survey', $survey->id);
+        }
+        $deleted = $query->delete();
 
         if ($deleted === 0) {
             return response()->json([
@@ -242,7 +255,7 @@ class P2RtController extends Controller
             ], 404);
         }
 
-        app(\App\Services\SurveyProgressService::class)->recordDelete($idP4, 'P2');
+        app(\App\Services\SurveyProgressService::class)->recordDelete($idP4, 'P2', $survey?->id);
 
         return response()->json([
             'status' => true,

@@ -17,6 +17,7 @@ class RtP7M extends Model
 
     protected $fillable = [
         'id',
+        'id_survey',
         'id_p4',
         'lhn_sawah_irigasi',
         'lhn_sawah_nonirigasi',

@@ -13,6 +13,7 @@ class RtP1004M extends Model
 
     protected $fillable = [
         'id',
+        'id_survey',
         'id_p4',
         'nama_lembaga',
         'jml_pengurus',

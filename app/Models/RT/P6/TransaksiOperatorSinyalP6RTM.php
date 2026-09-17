@@ -17,6 +17,7 @@ class TransaksiOperatorSinyalP6RTM extends Model
 
     protected $fillable = [
         'id',
+        'id_survey',
         'id_p4',
         'id_master_operator_sinyal',
         'jenis_sinyal_1',

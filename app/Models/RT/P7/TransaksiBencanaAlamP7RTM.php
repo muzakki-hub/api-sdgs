@@ -17,6 +17,7 @@ class TransaksiBencanaAlamP7RTM extends Model
 
     protected $fillable = [
         'id',
+        'id_survey',
         'id_master_bencana_alam',
         'id_p4',
 

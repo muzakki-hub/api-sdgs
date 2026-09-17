@@ -11,6 +11,7 @@ class SurveyProgress extends Model
     protected $fillable = [
         'id_parent',
         'form_code',
+        'id_survey',
         'skor_wajib',
         'skor_total',
     ];

@@ -14,6 +14,7 @@ class TransaksiKlbP9RTM extends Model
 
     protected $fillable = [
         'id',
+        'id_survey',
         'id_master_klb',
         'id_p4',
 

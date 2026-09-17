@@ -14,6 +14,7 @@ class TransaksiLembagaMasyarakatP10RTM extends Model
 
     protected $fillable = [
         'id',
+        'id_survey',
         'id_master_lembaga_masyarakat',
         'id_p4',
 

@@ -14,6 +14,7 @@ class TransaksiPerkelahianP11RTM extends Model
 
     protected $fillable = [
         'id',
+        'id_survey',
         'id_master_perkelahian',
         'id_p4',
         'penyebab_utama',

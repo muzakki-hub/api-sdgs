@@ -13,6 +13,7 @@ class RtP10M extends Model
 
     protected $fillable = [
         'id',
+        'id_survey',
         'id_p4',
         'peserta_jamkes',
         'peserta_jamkerja',

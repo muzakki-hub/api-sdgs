@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\RT\P10;
 
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Services\SurveyProgressService;
 use App\Models\Survey\Survey;
 use App\Models\RT\P10\RtP1004M;
 use App\Http\Controllers\Controller;
@@ -14,10 +16,7 @@ class P1004RtController extends Controller
      public function index($idP4)
     {
 
-        $now = Carbon::now();
-        $survey = Survey::where('tgl_mulai', '<=', $now)
-            ->where('tgl_akhir', '>=', $now)
-            ->first();
+                $survey = SurveyProgressService::getActiveSurvey();
 
         if (!$survey) {
             return response()->json([
@@ -26,7 +25,15 @@ class P1004RtController extends Controller
             ], 400);
         }
 
-        $data = RtP1004M::where('id_p4', $idP4)->orderBy('tgl_buat', 'desc')->get();
+        $userId = Auth::id() ?? $request->user()?->id;
+        if (!$userId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Sesi tidak valid atau pengguna belum login.',
+            ], 401);
+        }
+
+        $data = RtP1004M::where('id_p4', $idP4)->where('id_survey', $survey->id)->orderBy('tgl_buat', 'desc')->get();
 
         if ($data->isEmpty()) {
             return response()->json([
@@ -56,7 +63,7 @@ class P1004RtController extends Controller
             ], 400);
         }
 
-        $data = RtP1004M::where('id', $id)->first();
+        $data = RtP1004M::where('id', $id)->where('id_survey', $survey->id)->first();
 
         if (!$data) {
             return response()->json([
@@ -99,9 +106,21 @@ class P1004RtController extends Controller
         try {
             RtP1004M::create(array_merge($validated, [
                 'id'         => $id,
-                'tgl_buat'   => now(),
+                'id_survey' => $survey->id,
+                'id_buat' => $userId,
+                'id_update' => $userId,
+'tgl_buat'   => now(),
                 'tgl_update' => null,
             ]));
+
+                        app(\App\Services\SurveyProgressService::class)->syncProgress(
+                $validated['id_p4'],
+                'P1004',
+                'rt_p1004',
+                'id_p4',
+                [],
+                $survey->id
+            );
 
             return response()->json([
                 'status' => true,
@@ -131,6 +150,7 @@ class P1004RtController extends Controller
         }
 
         $data = RtP1004M::find($id);
+        if ($data && $data->id_survey !== $survey->id) { $data = null; }
 
         if (!$data) {
             return response()->json([
@@ -167,7 +187,7 @@ class P1004RtController extends Controller
 
     public function destroy($id)
     {
-        $data = RtP1004M::where('id', $id)->first();
+        $data = RtP1004M::where('id', $id)->where('id_survey', $survey->id)->first();
 
         if (!$data) {
             return response()->json([
@@ -177,7 +197,18 @@ class P1004RtController extends Controller
         }
 
         try {
+                        $idP4 = $data->id_p4;
+            $surveyId = $data->id_survey ?? $survey?->id;
             $data->delete();
+
+            app(\App\Services\SurveyProgressService::class)->syncProgress(
+                $idP4,
+                'P1004',
+                'rt_p1004',
+                'id_p4',
+                [],
+                $surveyId
+            );
 
             return response()->json([
                 'status' => true,
@@ -193,7 +224,9 @@ class P1004RtController extends Controller
 
     public function destroyAll($idP4)
     {
-        $deleted = RtP1004M::where('id_p4', $idP4)->delete();
+        $survey = SurveyProgressService::getActiveSurvey();
+        $deleted = RtP1004M::where('id_p4', $idP4)->where('id_survey', $survey?->id)->delete();
+        app(\App\Services\SurveyProgressService::class)->syncProgress($idP4, 'P1004', 'rt_p1004', 'id_p4', [], $survey?->id);
 
         if ($deleted == 0) {
             return response()->json([

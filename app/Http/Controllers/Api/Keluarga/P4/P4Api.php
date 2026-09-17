@@ -14,11 +14,15 @@ use App\Models\Keluarga\P2\KgP2M;
 
 class P4Api extends Controller
 {
-    // ✅ Ambil data P4 berdasarkan id_kg_p2
     public function showByIdP2($id)
     {
         try {
-            $data = KgP4M::where('id_kg_p2', $id)->first();
+            $survey = \App\Services\SurveyProgressService::getActiveSurvey();
+            $query = KgP4M::where('id_kg_p2', $id);
+            if ($survey) {
+                $query->where('id_survey', $survey->id);
+            }
+            $data = $query->first();
 
             if (!$data) {
                 return response()->json([
@@ -122,6 +126,22 @@ class P4Api extends Controller
             }
 
             // Helper to normalize bantuan enum '1'/'2'
+            $survey = \App\Services\SurveyProgressService::getActiveSurvey();
+            if (!$survey) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Saat ini tidak memasuki periode survei manapun',
+                ], 400);
+            }
+
+            $userId = Auth::id() ?? $request->user()?->id;
+            if (!$userId) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Sesi tidak valid atau pengguna belum login.',
+                ], 401);
+            }
+
             $normalizeBantuan = function ($val) {
                 if ($val === 1 || $val === '1' || $val === true || $val === 'true') {
                     return '1';
@@ -131,8 +151,8 @@ class P4Api extends Controller
 
             $data = KgP4M::create([
                 'id' => "KGP4-" . strtotime(date("Y-m-d H:i:s")),
-                'id_buat' => Auth::user()->id,
-                'id_survey' => $datap2->id_survey,
+                'id_buat' => $userId,
+                'id_survey' => $survey->id,
                 'tgl_buat' => now(),
                 'tgl_update' => now(),
 
@@ -175,7 +195,9 @@ class P4Api extends Controller
                 $request->id_kg_p2,
                 'P4',
                 'kg_p4',
-                'id_kg_p2'
+                'id_kg_p2',
+                [],
+                $survey->id
             );
 
             return response()->json([
@@ -194,11 +216,16 @@ class P4Api extends Controller
         }
     }
 
-    // GET DETAIL
+    // SHOW DETAIL
     public function show($id)
     {
         try {
-            $data = KgP4M::find($id);
+            $survey = \App\Services\SurveyProgressService::getActiveSurvey();
+            $query = KgP4M::where('id', $id);
+            if ($survey) {
+                $query->where('id_survey', $survey->id);
+            }
+            $data = $query->first();
 
             if (!$data) {
                 return response()->json([
@@ -227,10 +254,16 @@ class P4Api extends Controller
         DB::beginTransaction();
 
         try {
-            $data = KgP4M::where('id', $id)
-                ->orWhere('id_kg_p2', $id)
-                ->orWhere('id_kg_p2', $request->id_kg_p2)
-                ->first();
+            $survey = \App\Services\SurveyProgressService::getActiveSurvey();
+            $query = KgP4M::where(function ($q) use ($id, $request) {
+                $q->where('id', $id)
+                  ->orWhere('id_kg_p2', $id)
+                  ->orWhere('id_kg_p2', $request->id_kg_p2);
+            });
+            if ($survey) {
+                $query->where('id_survey', $survey->id);
+            }
+            $data = $query->first();
 
             if (!$data) {
                 DB::rollBack();
@@ -251,50 +284,51 @@ class P4Api extends Controller
                 }
 
                 if (!empty($p2Update)) {
-                    $p2Update['id_update'] = Auth::user()->id ?? 'SYSTEM';
+                    $userId = Auth::id() ?? $request->user()?->id ?? 'SYSTEM';
+                    $p2Update['id_update'] = $userId;
                     $p2Update['tgl_update'] = Carbon::now();
                     KgP2M::where('id', $data->id_kg_p2)->update($p2Update);
                 }
             }
 
             // Prepare payload for kg_p4
-            $payload = $request->except(['meteran_rumah', 'no_meteran', 'daya_meteran_rumah', 'atas_nama']);
+            $p4Payload = [];
+            $allFields = [
+                'tempat_tinggal_yg_ditempati', 'status_lahan_tempat_tinggal_yg_ditempati',
+                'luas_lantai_ttl_terluas', 'luas_lahan_ttl_terluas', 'jns_lantai_ttl_terluas',
+                'dinding_sebagian_besar_rumah', 'jendela', 'atap', 'penerangan_rumah',
+                'energi_untuk_memasak', 'sumber_kayu_bakar', 'tempat_pembuangan_sampah',
+                'fasilitas_mck', 'sumber_air_mandi', 'fasilitas_bab', 'sumber_air_minum',
+                'tmpt_pembuangan_limbah_cair', 'rumah_di_bantaran_sungai',
+                'rumah_dilereng_bukit_gunung', 'secara_keseluruhan_kondisi_rumah'
+            ];
 
-            // Normalize 'rumah_berada_dibawah' ('1' => 'Ya', '2' => 'Tidak')
-            if (isset($payload['rumah_berada_dibawah'])) {
-                if ($payload['rumah_berada_dibawah'] === '1' || $payload['rumah_berada_dibawah'] === 1) {
-                    $payload['rumah_berada_dibawah'] = 'Ya';
-                } elseif ($payload['rumah_berada_dibawah'] === '2' || $payload['rumah_berada_dibawah'] === 2) {
-                    $payload['rumah_berada_dibawah'] = 'Tidak';
+            foreach ($allFields as $field) {
+                if ($request->has($field)) {
+                    $p4Payload[$field] = $request->$field;
                 }
             }
 
-            // Normalize bantuan boolean/integer to enum '1'/'2'
-            $bantuanCols = ['blt_dana_desa', 'pkh', 'bst', 'banpres', 'bantuan_umkm', 'bantuan_pekerja', 'bantuan_anak', 'lainnya'];
-            foreach ($bantuanCols as $bCol) {
-                if (array_key_exists($bCol, $payload)) {
-                    if ($payload[$bCol] === 0 || $payload[$bCol] === '0' || $payload[$bCol] === false || $payload[$bCol] === 'false' || is_null($payload[$bCol])) {
-                        $payload[$bCol] = '2';
-                    } elseif ($payload[$bCol] === 1 || $payload[$bCol] === '1' || $payload[$bCol] === true || $payload[$bCol] === 'true') {
-                        $payload[$bCol] = '1';
-                    }
+            if ($request->has('rumah_berada_dibawah')) {
+                $val = $request->rumah_berada_dibawah;
+                if ($val === '1' || $val === 1) $p4Payload['rumah_berada_dibawah'] = 'Ya';
+                elseif ($val === '2' || $val === 2) $p4Payload['rumah_berada_dibawah'] = 'Tidak';
+                else $p4Payload['rumah_berada_dibawah'] = $val;
+            }
+
+            $bantuanFields = ['blt_dana_desa', 'pkh', 'bst', 'banpres', 'bantuan_umkm', 'bantuan_pekerja', 'bantuan_anak', 'lainnya'];
+            foreach ($bantuanFields as $field) {
+                if ($request->has($field)) {
+                    $val = $request->$field;
+                    $p4Payload[$field] = ($val === 1 || $val === '1' || $val === true || $val === 'true') ? '1' : '2';
                 }
             }
 
-            if (isset($payload['luas_lantai_ttl_terluas'])) {
-                $payload['luas_lantai_ttl_terluas'] = ($payload['luas_lantai_ttl_terluas'] === '' || is_null($payload['luas_lantai_ttl_terluas'])) ? 0 : (float)$payload['luas_lantai_ttl_terluas'];
-            }
-            if (isset($payload['luas_lahan_ttl_terluas'])) {
-                $payload['luas_lahan_ttl_terluas'] = ($payload['luas_lahan_ttl_terluas'] === '' || is_null($payload['luas_lahan_ttl_terluas'])) ? 0 : (float)$payload['luas_lahan_ttl_terluas'];
-            }
-            if (isset($payload['sumber_kayu_bakar']) && $payload['sumber_kayu_bakar'] === '') {
-                $payload['sumber_kayu_bakar'] = null;
-            }
+            $userId = Auth::id() ?? $request->user()?->id ?? 'SYSTEM';
+            $p4Payload['id_update'] = $userId;
+            $p4Payload['tgl_update'] = now();
 
-            $payload['id_update'] = Auth::user()->id ?? 'SYSTEM';
-            $payload['tgl_update'] = Carbon::now();
-
-            $data->update($payload);
+            $data->update($p4Payload);
 
             DB::commit();
 
@@ -302,7 +336,9 @@ class P4Api extends Controller
                 $data->id_kg_p2,
                 'P4',
                 'kg_p4',
-                'id_kg_p2'
+                'id_kg_p2',
+                [],
+                $data->id_survey ?? $survey?->id
             );
 
             return response()->json([
@@ -325,15 +361,23 @@ class P4Api extends Controller
     public function destroy($id)
     {
         try {
-            $data = KgP4M::where('id', $id)->orWhere('id_kg_p2', $id)->first();
+            $survey = \App\Services\SurveyProgressService::getActiveSurvey();
+            $query = KgP4M::where(function ($q) use ($id) {
+                $q->where('id', $id)->orWhere('id_kg_p2', $id);
+            });
+            if ($survey) {
+                $query->where('id_survey', $survey->id);
+            }
+            $data = $query->first();
 
             $idKgP2 = $data ? $data->id_kg_p2 : $id;
+            $surveyId = $data->id_survey ?? $survey?->id;
 
             if ($data) {
                 $data->delete();
             }
 
-            app(\App\Services\SurveyProgressService::class)->recordDelete($idKgP2, 'P4');
+            app(\App\Services\SurveyProgressService::class)->syncProgress($idKgP2, 'P4', 'kg_p4', 'id_kg_p2', [], $surveyId);
 
             return response()->json([
                 'status' => true,

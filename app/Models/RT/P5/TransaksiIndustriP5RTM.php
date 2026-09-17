@@ -18,6 +18,7 @@ class TransaksiIndustriP5RTM extends Model
 
     protected $fillable = [
         'id',
+        'id_survey',
         'id_master_jenis_industri',
         'id_p4',
         'jml_industri_kecil',

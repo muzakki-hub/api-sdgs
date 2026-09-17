@@ -17,6 +17,7 @@ class TransaksiGunaSumberP7RTM extends Model
 
     protected $fillable = [
         'id',
+        'id_survey',
         'id_master_guna_sumber',
         'id_p4',
 

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\RT\P7;
 
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Services\SurveyProgressService;
 use App\Models\Survey\Survey;
 use App\Http\Controllers\Controller;
 use App\Models\RT\P7\TransaksiPencemaranP7RTM;
@@ -12,16 +14,21 @@ class TransaksiPencemaranP7RtController extends Controller
 {
     public function store(Request $request)
     {
-        $now = Carbon::now();
-        $survey = Survey::where('tgl_mulai', '<=', $now)
-            ->where('tgl_akhir', '>=', $now)
-            ->first();
+                $survey = SurveyProgressService::getActiveSurvey();
 
         if (!$survey) {
             return response()->json([
                 'status' => false,
                 'message' => 'Saat ini tidak memasuki periode survei manapun',
             ], 400);
+        }
+
+        $userId = Auth::id() ?? $request->user()?->id;
+        if (!$userId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Sesi tidak valid atau pengguna belum login.',
+            ], 401);
         }
 
 
@@ -52,13 +59,25 @@ class TransaksiPencemaranP7RtController extends Controller
         try {
             TransaksiPencemaranP7RTM::create(array_merge($validated, [
                 'id'         => $id,
-                'tgl_buat'   => now(),
+                'id_survey' => $survey->id,
+                'id_buat' => $userId,
+                'id_update' => $userId,
+'tgl_buat'   => now(),
                 'tgl_update' => null,
             ]));
 
+                        app(\App\Services\SurveyProgressService::class)->syncProgress(
+                $validated['id_p4'],
+                'P709',
+                'transaksi_pencemaran_p7_rt',
+                'id_p4',
+                [],
+                $survey->id
+            );
+
             return response()->json([
                 'status' => true,
-                'message' => 'Data RT P709 berhasil disimpan',
+                'message' => 'Data P709 RT berhasil disimpan',
                 'id' => $id,
             ]);
         } catch (\Exception $e) {
@@ -84,7 +103,7 @@ class TransaksiPencemaranP7RtController extends Controller
         }
 
         $data = TransaksiPencemaranP7RTM::where('id_p4', $idP4)
-            ->where('id_master_lingkungan', $idMasterLingkungan)->first();
+            ->where('id_master_lingkungan', $idMasterLingkungan)->where('id_survey', $survey->id)->first();
 
         if (!$data) {
             return response()->json([
@@ -160,7 +179,8 @@ class TransaksiPencemaranP7RtController extends Controller
 
     public function destroy($idP4, $idMasterLingkungan)
     {
-        $data = TransaksiPencemaranP7RTM::where('id_p4', $idP4)->where('id_master_lingkungan', $idMasterLingkungan)->first();
+        $survey = SurveyProgressService::getActiveSurvey();
+        $data = TransaksiPencemaranP7RTM::where('id_p4', $idP4)->where('id_master_lingkungan', $idMasterLingkungan)->where('id_survey', $survey?->id)->first();
 
         if (!$data) {
             return response()->json([
@@ -170,7 +190,17 @@ class TransaksiPencemaranP7RtController extends Controller
         }
 
         try {
+                        $surveyId = $data->id_survey ?? $survey?->id;
             $data->delete();
+
+            app(\App\Services\SurveyProgressService::class)->syncProgress(
+                $idP4,
+                'P709',
+                'transaksi_pencemaran_p7_rt',
+                'id_p4',
+                [],
+                $surveyId
+            );
 
             return response()->json([
                 'status' => true,
@@ -186,7 +216,9 @@ class TransaksiPencemaranP7RtController extends Controller
 
     public function destroyAll($idP4)
     {
-        $deleted = TransaksiPencemaranP7RTM::where('id_p4', $idP4)->delete();
+        $survey = SurveyProgressService::getActiveSurvey();
+        $deleted = TransaksiPencemaranP7RTM::where('id_p4', $idP4)->where('id_survey', $survey?->id)->delete();
+        app(\App\Services\SurveyProgressService::class)->syncProgress($idP4, 'P709', 'transaksi_pencemaran_p7_rt', 'id_p4', [], $survey?->id);
 
         if ($deleted == 0) {
             return response()->json([

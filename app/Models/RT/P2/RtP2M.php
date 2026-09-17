@@ -12,6 +12,7 @@ class RtP2M extends Model
 
     protected $fillable = [
         'id',
+        'id_survey',
         'rt',
         'id_p4',
         'nama_ket_rt',

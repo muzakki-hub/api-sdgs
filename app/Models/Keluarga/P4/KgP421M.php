@@ -18,6 +18,7 @@ class KgP421M extends Model
         'jarak',
         'waktu_tempuh',
         'kemudahan',
+        'id_survey',
         'id_buat',
         'id_update',
         'tgl_buat',

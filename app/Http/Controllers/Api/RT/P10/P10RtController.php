@@ -25,7 +25,9 @@ class P10RtController extends Controller
             ], 400);
         }
 
-        $data = RtP10M::where('id_p4', $idP4)->first();
+        $data = RtP10M::where('id_p4', $idP4)
+            ->where('id_survey', $survey->id)
+            ->first();
 
         if (!$data) {
             return response()->json([
@@ -99,11 +101,21 @@ class P10RtController extends Controller
         try {
             RtP10M::create(array_merge($validated, [
                 'id'         => $id,
+                'id_survey'  => $survey->id,
                 'id_buat'    => $userId,
                 'id_update'  => $userId,
                 'tgl_buat'   => now(),
                 'tgl_update' => null,
             ]));
+
+            app(\App\Services\SurveyProgressService::class)->syncProgress(
+                $validated['id_p4'],
+                'P10',
+                'rt_p10',
+                'id_p4',
+                [],
+                $survey->id
+            );
 
             return response()->json([
                 'status' => true,
@@ -187,6 +199,15 @@ class P10RtController extends Controller
                 'tgl_update' => now(),
             ]));
 
+            app(\App\Services\SurveyProgressService::class)->syncProgress(
+                $validated['id_p4'] ?? $data->id_p4,
+                'P10',
+                'rt_p10',
+                'id_p4',
+                [],
+                $survey->id
+            );
+
             return response()->json([
                 'status' => true,
                 'message' => 'Data RT P10 berhasil diperbarui',
@@ -202,7 +223,12 @@ class P10RtController extends Controller
 
     public function destroy($idP4)
     {
-        $data = RtP10M::where('id_p4', $idP4)->first();
+        $survey = \App\Services\SurveyProgressService::getActiveSurvey();
+        $query = RtP10M::where('id_p4', $idP4);
+        if ($survey) {
+            $query->where('id_survey', $survey->id);
+        }
+        $data = $query->first();
 
         if (!$data) {
             return response()->json([
@@ -213,6 +239,8 @@ class P10RtController extends Controller
 
         try {
             $data->delete();
+
+            app(\App\Services\SurveyProgressService::class)->recordDelete($idP4, 'P10', $survey?->id);
 
             return response()->json([
                 'status' => true,

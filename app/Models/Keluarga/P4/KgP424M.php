@@ -20,6 +20,7 @@ class KgP424M extends Model
         'waktu_tempuh',
         'biaya_sekali',
         'kemudahan',
+        'id_survey',
         'id_buat',
         'id_update',
         'tgl_buat',

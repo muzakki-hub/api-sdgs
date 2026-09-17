@@ -29,7 +29,12 @@ class P422Api extends Controller
     public function showByIdP2($id)
     {
         try {
-            $rows = KgP422M::where('id_kg_p2', $id)->get();
+            $survey = SurveyProgressService::getActiveSurvey();
+            $query = KgP422M::where('id_kg_p2', $id);
+            if ($survey) {
+                $query->where('id_survey', $survey->id);
+            }
+            $rows = $query->get();
 
             if ($rows->isEmpty()) {
                 return response()->json([
@@ -87,22 +92,37 @@ class P422Api extends Controller
             ], 400);
         }
 
+        $survey = SurveyProgressService::getActiveSurvey();
+        if (!$survey) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Saat ini tidak memasuki periode survei manapun.',
+            ], 400);
+        }
+
+        $userId = Auth::id() ?? $request->user()?->id;
+        if (!$userId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Sesi tidak valid atau pengguna belum login.',
+            ], 401);
+        }
+
         DB::beginTransaction();
 
         try {
-            $userId = Auth::id() ?? 'SYSTEM';
-            $datap2 = KgP2M::find($idKgP2);
-            $idSurvey = $datap2 ? $datap2->id_survey : null;
+            $idSurvey = $survey->id;
             $now = now();
 
             foreach (self::FASKES_MAP as $idMaster => $key) {
-                $uniqueId = substr('422_' . md5($idKgP2 . $idMaster), 0, 25);
+                $uniqueId = substr('422_' . md5($idKgP2 . $idMaster . $idSurvey), 0, 25);
                 $kemudahan = $request->input("kemudahan_{$key}") ?: '1';
 
                 KgP422M::updateOrCreate(
                     [
                         'id_kg_p2' => $idKgP2,
                         'id_master_faskes' => $idMaster,
+                        'id_survey' => $idSurvey,
                     ],
                     [
                         'id' => $uniqueId,
@@ -123,7 +143,9 @@ class P422Api extends Controller
                 $idKgP2,
                 'P4.22',
                 'kg_p422',
-                'id_kg_p2'
+                'id_kg_p2',
+                [],
+                $idSurvey
             );
 
             return response()->json([
@@ -153,11 +175,16 @@ class P422Api extends Controller
         DB::beginTransaction();
 
         try {
-            KgP422M::where('id_kg_p2', $id)->orWhere('id', $id)->delete();
+            $survey = SurveyProgressService::getActiveSurvey();
+            $query = KgP422M::where('id_kg_p2', $id)->orWhere('id', $id);
+            if ($survey) {
+                $query->where('id_survey', $survey->id);
+            }
+            $query->delete();
 
             DB::commit();
 
-            app(SurveyProgressService::class)->recordDelete($id, 'P4.22');
+            app(SurveyProgressService::class)->syncProgress($id, 'P4.22', 'kg_p422', 'id_kg_p2', [], $survey?->id);
 
             return response()->json([
                 'status' => true,

@@ -14,6 +14,7 @@ class TransaksiKesehatanP9RTM extends Model
 
     protected $fillable = [
         'id',
+        'id_survey',
         'id_master_kesehatan',
         'id_p4',
 

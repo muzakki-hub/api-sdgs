@@ -4,15 +4,27 @@ namespace App\Http\Controllers\Api\RT\P6;
 
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Services\SurveyProgressService;
 use App\Models\Survey\Survey;
 use App\Http\Controllers\Controller;
 use App\Models\Master\MasterOperatorSinyalRTM;
 
 class MasterOperatorSinyalRtController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $data = MasterOperatorSinyalRTM::with('transaksi')->orderBy('tgl_buat', 'desc')->get();
+        $idP4 = $request->query('id_p4') ?? $request->query('idP4');
+        $survey = SurveyProgressService::getActiveSurvey();
+
+        $data = MasterOperatorSinyalRTM::with(['transaksi' => function ($q) use ($idP4, $survey) {
+            if ($survey) {
+                $q->where('id_survey', $survey->id);
+            }
+            if ($idP4) {
+                $q->where('id_p4', $idP4);
+            }
+        }])->orderBy('tgl_buat', 'desc')->get();
 
         if ($data->isEmpty()) {
             return response()->json([

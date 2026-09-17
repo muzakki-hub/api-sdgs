@@ -11,6 +11,7 @@ class RtP8M extends Model
     public $incrementing = false;
     protected $fillable = [
         'id',
+        'id_survey',
         'id_p4',
         'perpustakaan_taman_bacaan',
         'id_buat',

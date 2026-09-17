@@ -6,6 +6,7 @@ use App\Models\SurveyProgress;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class SurveyProgressService
 {
@@ -42,14 +43,21 @@ class SurveyProgressService
         string $formCode,
         string $table,
         string $parentColumn = 'id_kg_p2',
-        array $options = []
+        array $options = [],
+        ?string $idSurvey = null
     ): SurveyProgress {
+        $idSurvey = $idSurvey ?? self::getActiveSurvey()?->id;
+
         try {
-            $records = DB::table($table)->where($parentColumn, $idParent)->get();
+            $query = DB::table($table)->where($parentColumn, $idParent);
+            if ($idSurvey && Schema::hasColumn($table, 'id_survey')) {
+                $query->where('id_survey', $idSurvey);
+            }
+            $records = $query->get();
 
             if ($records->isEmpty()) {
                 return SurveyProgress::updateOrCreate(
-                    ['id_parent' => $idParent, 'form_code' => $formCode],
+                    ['id_parent' => $idParent, 'form_code' => $formCode, 'id_survey' => $idSurvey],
                     ['skor_wajib' => 0, 'skor_total' => 0]
                 );
             }
@@ -59,7 +67,7 @@ class SurveyProgressService
             $skorTotal = $this->calculateCompleteness($records, $table, $options);
 
             return SurveyProgress::updateOrCreate(
-                ['id_parent' => $idParent, 'form_code' => $formCode],
+                ['id_parent' => $idParent, 'form_code' => $formCode, 'id_survey' => $idSurvey],
                 ['skor_wajib' => $skorWajib, 'skor_total' => $skorTotal]
             );
         } catch (\Throwable $e) {
@@ -67,8 +75,8 @@ class SurveyProgressService
             
             // Fallback aman agar tidak menggagalkan flow utama
             return SurveyProgress::updateOrCreate(
-                ['id_parent' => $idParent, 'form_code' => $formCode],
-                ['skor_wajib' => 100, 'skor_total' => 100]
+                ['id_parent' => $idParent, 'form_code' => $formCode, 'id_survey' => $idSurvey],
+                ['skor_wajib' => 0, 'skor_total' => 0]
             );
         }
     }
@@ -145,21 +153,30 @@ class SurveyProgressService
     /**
      * Hapus record progress jika kuesioner dihapus.
      */
-    public function recordDelete(string $idParent, string $formCode): void
+    public function recordDelete(string $idParent, string $formCode, ?string $idSurvey = null): void
     {
-        SurveyProgress::where('id_parent', $idParent)
-            ->where('form_code', $formCode)
-            ->delete();
+        $idSurvey = $idSurvey ?? self::getActiveSurvey()?->id;
+
+        $query = SurveyProgress::where('id_parent', $idParent)
+            ->where('form_code', $formCode);
+        if ($idSurvey) {
+            $query->where('id_survey', $idSurvey);
+        }
+        $query->delete();
     }
 
     /**
      * Ambil seluruh progress kuesioner milik satu parent (1 query cepat).
      */
-    public function getProgressMap(string $idParent): Collection
+    public function getProgressMap(string $idParent, ?string $idSurvey = null): Collection
     {
-        return SurveyProgress::where('id_parent', $idParent)
-            ->get()
-            ->keyBy(fn ($item) => strtoupper($item->form_code));
+        $idSurvey = $idSurvey ?? self::getActiveSurvey()?->id;
+
+        $query = SurveyProgress::where('id_parent', $idParent);
+        if ($idSurvey) {
+            $query->where('id_survey', $idSurvey);
+        }
+        return $query->get()->keyBy(fn ($item) => strtoupper($item->form_code));
     }
 
     /**
@@ -172,14 +189,21 @@ class SurveyProgressService
         string $formCode,
         string $table,
         string $parentColumn = 'id_p4',
-        ?SurveyProgress $cached = null
+        ?SurveyProgress $cached = null,
+        ?string $idSurvey = null
     ): array {
+        $idSurvey = $idSurvey ?? self::getActiveSurvey()?->id;
+
         try {
-            // Cek keberadaan baris fisik di database (SELECT 1 LIMIT 1, sangat cepat)
-            $hasRecord = DB::table($table)->where($parentColumn, $idParent)->exists();
+            // Cek keberadaan baris fisik di database sesuai survey aktif
+            $query = DB::table($table)->where($parentColumn, $idParent);
+            if ($idSurvey && Schema::hasColumn($table, 'id_survey')) {
+                $query->where('id_survey', $idSurvey);
+            }
+            $hasRecord = $query->exists();
 
             if (!$hasRecord) {
-                // Self-healing: jika record fisik terhapus, pastikan cache survey_progress di-reset ke 0
+                // Self-healing: jika record fisik terhapus/belum ada di survei ini, pastikan cache survey_progress di-reset ke 0
                 if ($cached && ($cached->skor_wajib > 0 || $cached->skor_total > 0)) {
                     $cached->update(['skor_wajib' => 0, 'skor_total' => 0]);
                 }
@@ -195,7 +219,7 @@ class SurveyProgressService
             }
 
             // Jika belum dihitung kelengkapannya, jalankan sinkronisasi
-            $synced = $this->syncProgress($idParent, $formCode, $table, $parentColumn);
+            $synced = $this->syncProgress($idParent, $formCode, $table, $parentColumn, [], $idSurvey);
             return [
                 'skor_wajib' => (int) $synced->skor_wajib,
                 'skor_total' => (int) $synced->skor_total,

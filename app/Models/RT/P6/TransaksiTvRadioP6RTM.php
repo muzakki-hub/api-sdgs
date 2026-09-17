@@ -17,6 +17,7 @@ class TransaksiTvRadioP6RTM extends Model
 
        protected $fillable = [
         'id',
+        'id_survey',
         'id_p4',
         'id_master_tv_radio',
         'diterima',

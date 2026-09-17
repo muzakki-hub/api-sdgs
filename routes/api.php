@@ -109,6 +109,7 @@ Route::group([
         Route::resource('/p424', P424Api::class);
         Route::get('/p424/by-p2/{id}', [P424Api::class, 'showByIdP2']);
         Route::get('/progress/{idP2}', [KgprogressController::class, 'getProgress']);
+        Route::post('/tarik-data-sebelumnya/{idP2}', [\App\Http\Controllers\Api\SurveyTransferController::class, 'tarikDataSebelumnyaKg']);
     });
 
 
@@ -375,6 +376,7 @@ Route::prefix('rt')->middleware('auth:sanctum')->group(function () {
 
     Route::get('/export/{idP4}/{idP3}', [ExportRtController::class, 'export']);
     Route::get('/progress/{idP4}', [RtprogressController::class, 'getProgress']);
+    Route::post('/tarik-data-sebelumnya/{idP4}', [\App\Http\Controllers\Api\SurveyTransferController::class, 'tarikDataSebelumnyaRt']);
 
 
     // Route::post('/progress/rt/{id_p4}', [RtprogressController::class, 'progressRT']);

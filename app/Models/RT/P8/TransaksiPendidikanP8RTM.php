@@ -16,6 +16,7 @@ class TransaksiPendidikanP8RTM extends Model
 
     protected $fillable = [
         'id',
+        'id_survey',
         'id_master_pendidikan',
         'id_p4',
         'nama_pendidikan',
