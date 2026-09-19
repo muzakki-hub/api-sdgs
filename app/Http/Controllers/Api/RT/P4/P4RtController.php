@@ -154,7 +154,7 @@ class P4RtController extends Controller
             if (!empty($files)) {
 
                 $fileName = basename($files[0]);
-                $fotoUrl = secure_asset('uploads/rt_p4/' . $fileName);
+                $fotoUrl = '/uploads/rt_p4/' . $fileName;
             }
         }
         $data->foto_ket_rt = $fotoUrl;

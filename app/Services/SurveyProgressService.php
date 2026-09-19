@@ -30,6 +30,23 @@ class SurveyProgressService
     ];
 
     /**
+     * Pemetaan kode indikator master RT ke tabel master acuannya.
+     */
+    protected const MASTER_TABLE_MAP = [
+        'P502'  => 'master_jenis_industri_rt',
+        'P508'  => 'master_sarana_ekonomi_rt',
+        'P607'  => 'master_operator_sinyal_rt',
+        'P609'  => 'master_tv_radio_rt',
+        'P706'  => 'master_guna_sumber_rt',
+        'P709'  => 'master_lingkungan_rt',
+        'P713'  => 'master_bencana_alam_rt',
+        'P902'  => 'master_klb_rt',
+        'P1009' => 'master_lembaga_masyarakat_rt',
+        'P1101' => 'master_perkelahian_rt',
+        'P1102' => 'master_kejahatan_rt',
+    ];
+
+    /**
      * Sinkronkan progress suatu indikator/form ke tabel survey_progress.
      *
      * @param string $idParent     ID entitas induk (id_kg_p2 untuk Keluarga, id_p4 untuk RT, dst.)
@@ -63,22 +80,39 @@ class SurveyProgressService
                 );
             }
 
+            $formUpper = strtoupper($formCode);
+            $isMasterTable = isset(self::MASTER_TABLE_MAP[$formUpper]);
+            $totalExpectedRows = $isMasterTable
+                ? DB::table(self::MASTER_TABLE_MAP[$formUpper])->count()
+                : $records->count();
+
             $hasColumnVerified = Schema::hasColumn($table, 'is_verified');
             $verifiedCount = $hasColumnVerified ? $records->where('is_verified', 1)->count() : $records->count();
-            $totalCount = $records->count();
+            $filledCount = $records->count();
+
+            if ($totalExpectedRows <= 0) {
+                $totalExpectedRows = max(1, $filledCount);
+            }
 
             if ($hasColumnVerified && $verifiedCount === 0) {
                 // Seluruh data berasal dari hasil tarik dan belum diverifikasi
                 $skorWajib = 0;
                 $skorTotal = 0;
                 $statusVerifikasi = 'draft_tarik';
-            } elseif ($hasColumnVerified && $verifiedCount < $totalCount) {
-                // Sebagian sudah diverifikasi (pada multi-record)
-                $skorWajib = (int) round(($verifiedCount / $totalCount) * 100);
-                $skorTotal = $this->calculateCompleteness($records->where('is_verified', 1), $table, $options);
+            } elseif ($filledCount < $totalExpectedRows || ($hasColumnVerified && $verifiedCount < $filledCount)) {
+                // Sebagian sudah terisi atau sebagian sudah diverifikasi
+                $verifiedRatio = min(1.0, $verifiedCount / $totalExpectedRows);
+                $filledRatio = min(1.0, $filledCount / $totalExpectedRows);
+                $itemCompleteness = $this->calculateCompleteness(
+                    $hasColumnVerified ? $records->where('is_verified', 1) : $records,
+                    $table,
+                    $options
+                );
+                $skorWajib = (int) round($verifiedRatio * 100);
+                $skorTotal = (int) round($filledRatio * $itemCompleteness);
                 $statusVerifikasi = 'sebagian_terverifikasi';
             } else {
-                // Terverifikasi penuh
+                // Terisi penuh dan terverifikasi penuh
                 $skorWajib = 100;
                 $skorTotal = $this->calculateCompleteness($records, $table, $options);
                 $statusVerifikasi = 'terverifikasi';
@@ -174,6 +208,16 @@ class SurveyProgressService
                     unset($row['pendidikan_terakhir_lainnya']);
                 }
                 break;
+
+            case 'rt_p11':
+                if (isset($row['ada_pos_polisi'])) {
+                    if ((string) $row['ada_pos_polisi'] === '1') {
+                        unset($row['jarak_ke_pos_polisi_terdekat']);
+                    } elseif ((string) $row['ada_pos_polisi'] === '2') {
+                        unset($row['jumlah_pos_polisi_digunakan'], $row['jumlah_pos_polisi_tidak_digunakan']);
+                    }
+                }
+                break;
         }
 
         return $row;
@@ -237,6 +281,16 @@ class SurveyProgressService
                     $cached->update(['skor_wajib' => 0, 'skor_total' => 0, 'status_verifikasi' => 'belum_diisi']);
                 }
                 return ['skor_wajib' => 0, 'skor_total' => 0, 'status_verifikasi' => 'belum_diisi'];
+            }
+
+            // Validasi master table: pastikan jumlah baris terisi sesuai jumlah master sebelum menganggap selesai
+            $formUpper = strtoupper($formCode);
+            $isMasterTable = isset(self::MASTER_TABLE_MAP[$formUpper]);
+            if ($isMasterTable) {
+                $totalMaster = DB::table(self::MASTER_TABLE_MAP[$formUpper])->count();
+                if ($query->count() < $totalMaster) {
+                    $cached = null; // Re-sync to reflect partial progress
+                }
             }
 
             // Jika record fisik ada dan sudah di-cache sebagai selesai, gunakan nilai cache
