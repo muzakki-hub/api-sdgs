@@ -253,4 +253,121 @@ class SurveyCopyService
             return ['status' => false, 'message' => 'Gagal menarik data: ' . $e->getMessage()];
         }
     }
+
+    /**
+     * Salin data kuesioner Individu dari survei sebelumnya ke survei aktif.
+     */
+    public function copyIndividuData(string $idP1, ?string $userId = null): array
+    {
+        $activeSurvey = SurveyProgressService::getActiveSurvey();
+        if (!$activeSurvey) {
+            return ['status' => false, 'message' => 'Saat ini tidak memasuki periode survei manapun.'];
+        }
+
+        $prevSurvey = self::getPreviousSurvey($activeSurvey);
+        if (!$prevSurvey) {
+            return ['status' => false, 'message' => 'Tidak ditemukan data survei sebelumnya untuk ditarik.'];
+        }
+
+        $currentP1 = DB::table('individu_p1')->where('id', $idP1)->first();
+        if (!$currentP1) {
+            return ['status' => false, 'message' => 'Data individu tidak ditemukan.'];
+        }
+
+        $prevP1 = DB::table('individu_p1')
+            ->where('id_survey', $prevSurvey->id)
+            ->where(function ($q) use ($currentP1) {
+                if (!empty($currentP1->nik)) {
+                    $q->where('nik', $currentP1->nik);
+                } else {
+                    $q->where('nama', $currentP1->nama);
+                }
+            })
+            ->first();
+
+        if (!$prevP1) {
+            return ['status' => false, 'message' => 'Tidak ditemukan data kuesioner individu pada survei sebelumnya.'];
+        }
+
+        $userId = $userId ?? Auth::id() ?? 'SYSTEM';
+        $now = now();
+        $totalCopied = 0;
+
+        $singleTables = [
+            'individu_p2' => ['code' => 'P2', 'prefix' => 'IDVP2'],
+            'individu_p4' => ['code' => 'P4', 'prefix' => 'IDVP4'],
+            'individu_p5' => ['code' => 'P5', 'prefix' => 'IDVP5'],
+        ];
+
+        $multiTables = [
+            'individu_p204' => ['code' => 'P204', 'prefix' => 'IDVP204', 'uniqueCol' => 'id_master_penghasilan'],
+            'individu_p401' => ['code' => 'P401', 'prefix' => 'IDVP401', 'uniqueCol' => 'id_master_penyakit'],
+            'individu_p402' => ['code' => 'P402', 'prefix' => 'IDVP402', 'uniqueCol' => 'id_master_sarkes'],
+        ];
+
+        DB::beginTransaction();
+        try {
+            foreach ($singleTables as $table => $cfg) {
+                $exists = DB::table($table)->where('id_individu_p1', $idP1)->exists();
+                if ($exists) continue;
+
+                $prevRow = DB::table($table)->where('id_individu_p1', $prevP1->id)->first();
+                if ($prevRow) {
+                    $data = (array) $prevRow;
+                    $data['id'] = $cfg['prefix'] . '-' . strtotime(now()) . rand(100, 999);
+                    $data['id_individu_p1'] = $idP1;
+                    $data['id_buat'] = $userId;
+                    $data['id_update'] = $userId;
+                    $data['tgl_buat'] = $now;
+                    $data['tgl_update'] = $now;
+                    DB::table($table)->insert($data);
+                    $totalCopied++;
+                }
+            }
+
+            foreach ($multiTables as $table => $cfg) {
+                $prevRows = DB::table($table)->where('id_individu_p1', $prevP1->id)->get();
+                foreach ($prevRows as $prevRow) {
+                    $uniqueVal = $cfg['uniqueCol'] ? ($prevRow->{$cfg['uniqueCol']} ?? null) : null;
+                    $query = DB::table($table)->where('id_individu_p1', $idP1);
+                    if ($uniqueVal && $cfg['uniqueCol']) {
+                        $query->where($cfg['uniqueCol'], $uniqueVal);
+                    }
+                    if ($query->exists()) continue;
+
+                    $data = (array) $prevRow;
+                    $data['id'] = $cfg['prefix'] . '-' . strtotime(now()) . rand(100, 999);
+                    $data['id_individu_p1'] = $idP1;
+                    $data['id_buat'] = $userId;
+                    $data['id_update'] = $userId;
+                    $data['tgl_buat'] = $now;
+                    $data['tgl_update'] = $now;
+                    DB::table($table)->insert($data);
+                    $totalCopied++;
+                }
+            }
+
+            DB::commit();
+
+            $progressService = app(SurveyProgressService::class);
+            foreach ($singleTables as $table => $cfg) {
+                $progressService->syncProgress($idP1, $cfg['code'], $table, 'id_individu_p1');
+            }
+            foreach ($multiTables as $table => $cfg) {
+                $progressService->syncProgress($idP1, $cfg['code'], $table, 'id_individu_p1');
+            }
+
+            return [
+                'status' => true,
+                'message' => "Berhasil menarik {$totalCopied} data instrumen Individu dari survei sebelumnya ({$prevSurvey->deskripsi}).",
+                'total_copied' => $totalCopied,
+                'source_survey' => $prevSurvey->id,
+            ];
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error("[SurveyCopyService Individu] " . $e->getMessage());
+            return ['status' => false, 'message' => 'Gagal menarik data: ' . $e->getMessage()];
+        }
+    }
 }
+

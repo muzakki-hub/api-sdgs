@@ -158,6 +158,7 @@ Route::group([
 
         // INDIVIDU PROGRESS
         Route::get('/progress/{idP1}', [IdvprogressController::class, 'getProgress']);
+        Route::post('/tarik-data-sebelumnya/{idP1}', [\App\Http\Controllers\Api\SurveyTransferController::class, 'tarikDataSebelumnyaIdv']);
     });
     
     Route::prefix('master')->group(function () {

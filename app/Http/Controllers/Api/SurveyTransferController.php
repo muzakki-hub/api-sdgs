@@ -34,9 +34,48 @@ class SurveyTransferController extends Controller
         return response()->json($result, $statusCode);
     }
 
+    public function tarikDataSebelumnyaIdv(Request $request, $idP1)
+    {
+        $userId = Auth::id() ?? $request->user()?->id;
+        $result = $this->copyService->copyIndividuData($idP1, $userId);
+
+        $statusCode = ($result['status'] ?? false) ? 200 : 400;
+        return response()->json($result, $statusCode);
+    }
+
     public function getWilayahOptions(Request $request)
     {
         $level = strtolower($request->query('level', 'rt'));
+
+        if ($level === 'individu' || $level === 'idv') {
+            $individuals = \Illuminate\Support\Facades\DB::table('individu_p1')
+                ->select('id', 'nama', 'nik')
+                ->orderBy('nama', 'asc')
+                ->get();
+
+            $targets = $individuals->map(fn($ind) => [
+                'id' => $ind->id,
+                'label' => ($ind->nama ?? 'Tanpa Nama') . ' (' . ($ind->nik ?? '-') . ')',
+            ])->values();
+
+            $groups = [];
+            if ($targets->isNotEmpty()) {
+                $groups[] = [
+                    'id' => 'all',
+                    'label' => 'Seluruh Individu (' . $targets->count() . ' Orang)',
+                    'targets' => $targets,
+                ];
+            }
+
+            return response()->json([
+                'status' => true,
+                'data' => [
+                    'level' => 'individu',
+                    'totalTarget' => $targets->count(),
+                    'groups' => $groups,
+                ]
+            ]);
+        }
 
         if ($level === 'keluarga' || $level === 'kg') {
             $families = \Illuminate\Support\Facades\DB::table('kg_p2')
