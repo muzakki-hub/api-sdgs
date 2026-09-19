@@ -298,6 +298,10 @@ class SurveyProgressService
         if ($level === 'keluarga' || $level === 'kg') {
             $requiredForms = ['P4', 'P4.21', 'P4.22', 'P4.23', 'P4.24'];
             $totalTarget = DB::table('kg_p2')->count();
+        } elseif ($level === 'individu' || $level === 'idv') {
+            $level = 'individu';
+            $requiredForms = ['P2', 'P204', 'P4', 'P401', 'P402', 'P5'];
+            $totalTarget = DB::table('individu_p1')->count();
         } else {
             // Default RT
             $level = 'rt';
