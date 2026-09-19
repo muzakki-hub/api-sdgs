@@ -93,6 +93,14 @@ class P1004RtController extends Controller
             ], 400);
         }
 
+        $userId = Auth::id() ?? $request->user()?->id ?? auth('sanctum')->id();
+        if (!$userId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Sesi tidak valid atau pengguna belum login.',
+            ], 401);
+        }
+
         $validated = $request->validate([
             'id_p4' => 'required|string|max:25',
             'nama_lembaga' => 'required|string',

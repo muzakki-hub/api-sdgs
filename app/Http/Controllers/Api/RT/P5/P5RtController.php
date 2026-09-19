@@ -39,9 +39,9 @@ class P5RtController extends Controller
             'jml_koperasi_serbausaha' => 'nullable|integer',
             'jml_koperasi_lain' => 'nullable|integer',
 
-            'kios_kud' => 'required|in:1,2',
-            'kios_bumdes' => 'required|in:1,2',
-            'kios_lain' => 'required|in:1,2',
+            'kios_kud' => 'nullable|integer',
+            'kios_bumdes' => 'nullable|integer',
+            'kios_lain' => 'nullable|integer',
 
             'kur' => 'required|in:1,2',
             'kkpe' => 'required|in:1,2',

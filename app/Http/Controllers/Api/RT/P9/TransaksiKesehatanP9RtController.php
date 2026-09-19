@@ -63,6 +63,14 @@ class TransaksiKesehatanP9RtController extends Controller
             ], 400);
         }
 
+        $userId = Auth::id() ?? $request->user()?->id ?? auth('sanctum')->id();
+        if (!$userId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Sesi tidak valid atau pengguna belum login.',
+            ], 401);
+        }
+
         $validated = $request->validate([
             'id_master_kesehatan' => 'required|string|max:25',
             'id_p4' => 'required|string|max:25',
