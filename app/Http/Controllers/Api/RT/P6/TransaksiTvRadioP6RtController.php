@@ -42,19 +42,31 @@ class TransaksiTvRadioP6RtController extends Controller
             $validated['parabola'] = null;
         }
 
-        $id = 'P609-' . strtotime(now());
-
         try {
-            TransaksiTvRadioP6RTM::create(array_merge($validated, [
-                'id'         => $id,
-                'id_survey' => $survey->id,
-                'id_buat' => $userId,
-                'id_update' => $userId,
-'tgl_buat'   => now(),
-                'tgl_update' => null,
-            ]));
+            $existing = TransaksiTvRadioP6RTM::where('id_p4', $validated['id_p4'])
+                ->where('id_master_tv_radio', $validated['id_master_tv_radio'])
+                ->where('id_survey', $survey->id)
+                ->first();
 
-                        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            if ($existing) {
+                $existing->update(array_merge($validated, [
+                    'id_update' => $userId,
+                    'tgl_update' => now(),
+                ]));
+                $id = $existing->id;
+            } else {
+                $id = 'P609-' . strtotime(now());
+                TransaksiTvRadioP6RTM::create(array_merge($validated, [
+                    'id'         => $id,
+                    'id_survey'  => $survey->id,
+                    'id_buat'    => $userId,
+                    'id_update'  => $userId,
+                    'tgl_buat'   => now(),
+                    'tgl_update' => null,
+                ]));
+            }
+
+            app(\App\Services\SurveyProgressService::class)->syncProgress(
                 $validated['id_p4'],
                 'P609',
                 'transaksi_tv_p6_rt',
@@ -159,9 +171,12 @@ class TransaksiTvRadioP6RtController extends Controller
     public function destroy($idP4, $idMasterTvRadio)
     {
         $survey = SurveyProgressService::getActiveSurvey();
-        $data = TransaksiTvRadioP6RTM::where('id_p4', $idP4)->where('id_master_tv_radio', $idMasterTvRadio)->where('id_survey', $survey?->id)->first();
+        $surveyId = $survey?->id;
 
-        if (!$data) {
+        $query = TransaksiTvRadioP6RTM::where('id_p4', $idP4)
+            ->where('id_master_tv_radio', $idMasterTvRadio);
+
+        if ($query->count() === 0) {
             return response()->json([
                 'status' => false,
                 'message' => 'Data RT P609 tidak ditemukan',
@@ -169,8 +184,7 @@ class TransaksiTvRadioP6RtController extends Controller
         }
 
         try {
-                        $surveyId = $data->id_survey ?? $survey?->id;
-            $data->delete();
+            $query->delete();
 
             app(\App\Services\SurveyProgressService::class)->syncProgress(
                 $idP4,

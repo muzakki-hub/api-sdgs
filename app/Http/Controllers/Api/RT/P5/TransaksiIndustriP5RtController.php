@@ -41,19 +41,31 @@ class TransaksiIndustriP5RtController extends Controller
             'jml_pekerja' => 'required|integer',
         ]);
 
-        $id = 'P502-' . strtotime(now());
-
         try {
-            TransaksiIndustriP5RTM::create(array_merge($validated, [
-                'id'         => $id,
-                'id_survey' => $survey->id,
-                'id_buat' => $userId,
-                'id_update' => $userId,
-'tgl_buat'   => now(),
-                'tgl_update' => null,
-            ]));
+            $existing = TransaksiIndustriP5RTM::where('id_p4', $validated['id_p4'])
+                ->where('id_master_jenis_industri', $validated['id_master_jenis_industri'])
+                ->where('id_survey', $survey->id)
+                ->first();
 
-                        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            if ($existing) {
+                $existing->update(array_merge($validated, [
+                    'id_update' => $userId,
+                    'tgl_update' => now(),
+                ]));
+                $id = $existing->id;
+            } else {
+                $id = 'P502-' . strtotime(now());
+                TransaksiIndustriP5RTM::create(array_merge($validated, [
+                    'id'         => $id,
+                    'id_survey'  => $survey->id,
+                    'id_buat'    => $userId,
+                    'id_update'  => $userId,
+                    'tgl_buat'   => now(),
+                    'tgl_update' => null,
+                ]));
+            }
+
+            app(\App\Services\SurveyProgressService::class)->syncProgress(
                 $validated['id_p4'],
                 'P502',
                 'transaksi_industri_p5_rt',
@@ -152,20 +164,21 @@ class TransaksiIndustriP5RtController extends Controller
 
     public function destroy($idP4, $idMasterIndustri)
     {
-
         $survey = SurveyProgressService::getActiveSurvey();
-        $data = TransaksiIndustriP5RTM::where('id_p4', $idP4)
-            ->where('id_master_jenis_industri', $idMasterIndustri)->where('id_survey', $survey?->id)->first();
+        $surveyId = $survey?->id;
 
-        if (!$data) {
+        $query = TransaksiIndustriP5RTM::where('id_p4', $idP4)
+            ->where('id_master_jenis_industri', $idMasterIndustri);
+
+        if ($query->count() === 0) {
             return response()->json([
                 'status' => false,
                 'message' => 'Data tidak ditemukan',
             ], 404);
         }
 
-                    $surveyId = $data->id_survey ?? $survey?->id;
-            $data->delete();
+        try {
+            $query->delete();
 
             app(\App\Services\SurveyProgressService::class)->syncProgress(
                 $idP4,
@@ -176,10 +189,16 @@ class TransaksiIndustriP5RtController extends Controller
                 $surveyId
             );
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Data RT P502 berhasil dihapus',
-        ], 200);
+            return response()->json([
+                'status' => true,
+                'message' => 'Data RT P502 berhasil dihapus',
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Gagal menghapus data RT P502: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function destroyAll($idP4)

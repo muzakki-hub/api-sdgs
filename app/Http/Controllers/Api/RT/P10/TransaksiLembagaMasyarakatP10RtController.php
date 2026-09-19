@@ -43,19 +43,31 @@ class TransaksiLembagaMasyarakatP10RtController extends Controller
             'fasilitas' => 'required|in:1,2,3,4',
         ]);
 
-        $id = 'P1009-' . strtotime(now());
-
         try {
-            TransaksiLembagaMasyarakatP10RTM::create(array_merge($validated, [
-                'id'         => $id,
-                'id_survey' => $survey->id,
-                'id_buat' => $userId,
-                'id_update' => $userId,
-'tgl_buat'   => now(),
-                'tgl_update' => null,
-            ]));
+            $existing = TransaksiLembagaMasyarakatP10RTM::where('id_p4', $validated['id_p4'])
+                ->where('id_master_lembaga_masyarakat', $validated['id_master_lembaga_masyarakat'])
+                ->where('id_survey', $survey->id)
+                ->first();
 
-                        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            if ($existing) {
+                $existing->update(array_merge($validated, [
+                    'id_update' => $userId,
+                    'tgl_update' => now(),
+                ]));
+                $id = $existing->id;
+            } else {
+                $id = 'P1009-' . strtotime(now());
+                TransaksiLembagaMasyarakatP10RTM::create(array_merge($validated, [
+                    'id'         => $id,
+                    'id_survey'  => $survey->id,
+                    'id_buat'    => $userId,
+                    'id_update'  => $userId,
+                    'tgl_buat'   => now(),
+                    'tgl_update' => null,
+                ]));
+            }
+
+            app(\App\Services\SurveyProgressService::class)->syncProgress(
                 $validated['id_p4'],
                 'P1009',
                 'transaksi_lembaga_masyarakat_p10_rt',
@@ -164,11 +176,13 @@ class TransaksiLembagaMasyarakatP10RtController extends Controller
 
     public function destroy($idP4, $idMasterLembaga)
     {
-        $data = TransaksiLembagaMasyarakatP10RTM::where('id_p4', $idP4)
-            ->where('id_master_lembaga_masyarakat', $idMasterLembaga)
-            ->first();
+        $survey = SurveyProgressService::getActiveSurvey();
+        $surveyId = $survey?->id;
 
-        if (!$data) {
+        $query = TransaksiLembagaMasyarakatP10RTM::where('id_p4', $idP4)
+            ->where('id_master_lembaga_masyarakat', $idMasterLembaga);
+
+        if ($query->count() === 0) {
             return response()->json([
                 'status' => false,
                 'message' => 'Data RT P1009 tidak ditemukan',
@@ -176,8 +190,7 @@ class TransaksiLembagaMasyarakatP10RtController extends Controller
         }
 
         try {
-                        $surveyId = $data->id_survey ?? $survey?->id;
-            $data->delete();
+            $query->delete();
 
             app(\App\Services\SurveyProgressService::class)->syncProgress(
                 $idP4,

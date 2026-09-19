@@ -168,6 +168,9 @@ class P1IdvApi extends Controller
 
         $data->delete();
 
+        // Bersihkan progress survei terkait
+        \App\Models\SurveyProgress::where('id_parent', $id)->delete();
+
         return response()->json([
             'status' => true,
             'message' => 'Data individu berhasil dihapus'

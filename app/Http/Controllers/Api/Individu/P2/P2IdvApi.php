@@ -43,6 +43,13 @@ class P2IdvApi extends Controller
             'tgl_update' => $today
         ]);
 
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $request->id_individu_p1,
+            'P2',
+            'individu_p2',
+            'id_individu_p1'
+        );
+
         return response()->json([
             'status' => true,
             'message' => 'Data Individu P2 berhasil disimpan',
@@ -51,7 +58,14 @@ class P2IdvApi extends Controller
     }
     public function show($id)
     {
-        $data = IdvP2M::findOrFail($id);
+        $data = IdvP2M::where('id', $id)->orWhere('id_individu_p1', $id)->first();
+
+        if (!$data) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Data tidak ditemukan'
+            ], 404);
+        }
 
         return response()->json([
             'status' => true,
@@ -63,28 +77,51 @@ class P2IdvApi extends Controller
     public function update(Request $request, $id)
     {
         $today = Carbon::now();
-        $data = IdvP2M::where('id', $id)->update([
-            'kondisi_pekerjaan' => $request->kondisi_pekerjaan,
-            'pekerjaan_utama' => $request->pekerjaan_utama,
-            'pekerjaan_lainnya' => $request->pekerjaan_lainnya,
-            'jsk' => $request->jsk,
+        $record = IdvP2M::where('id', $id)->orWhere('id_individu_p1', $id)->first();
 
-            // 'id_buat' => Auth::user()->id,
-            'id_update' => Auth::user()->id,
-            // 'tgl_buat' => $today,
-            'tgl_update' => $today
-        ]);
+        if ($record) {
+            $record->update([
+                'kondisi_pekerjaan' => $request->kondisi_pekerjaan,
+                'pekerjaan_utama' => $request->pekerjaan_utama,
+                'pekerjaan_lainnya' => $request->pekerjaan_lainnya,
+                'jsk' => $request->jsk,
+                'id_update' => Auth::user()->id,
+                'tgl_update' => $today
+            ]);
+            $idP1 = $record->id_individu_p1;
+        } else {
+            $idP1 = $request->id_individu_p1 ?? $id;
+        }
+
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $idP1,
+            'P2',
+            'individu_p2',
+            'id_individu_p1'
+        );
 
         return response()->json([
             'status' => true,
             'message' => 'Data Individu P2 berhasil di update',
-            'data' => $data
+            'data' => $record
         ]);
     }
 
     public function destroy($id)
     {
-        IdvP2M::findOrFail($id)->delete();
+        $record = IdvP2M::where('id', $id)->orWhere('id_individu_p1', $id)->first();
+        $idP1 = $record ? $record->id_individu_p1 : $id;
+
+        if ($record) {
+            $record->delete();
+        }
+
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $idP1,
+            'P2',
+            'individu_p2',
+            'id_individu_p1'
+        );
 
         return response()->json([
             'status' => true,

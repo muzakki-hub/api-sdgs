@@ -49,6 +49,13 @@ class P204IdvApi extends Controller
             'tgl_update' => $today
         ]);
 
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $request->id_individu_p1,
+            'P204',
+            'individu_p204',
+            'id_individu_p1'
+        );
+
         return response()->json([
             'status' => true,
             'message' => 'Data Individu P204 berhasil disimpan',
@@ -69,29 +76,55 @@ class P204IdvApi extends Controller
     public function update(Request $request, $id)
     {
         $today = Carbon::now();
-        $data = IdvP204M::where('id', $id)->update([
-            'id_master_penghasilan' => $request->id_master_penghasilan,
-            'jumlah' => $request->jumlah,
-            'satuan' => $request->satuan,
-            'penghasilan' => $request->penghasilan,
-            'diekspor' => $request->diekspor,
+        $record = IdvP204M::find($id);
 
-            // 'id_buat' => Auth::user()->id,
-            'id_update' => Auth::user()->id,
-            // 'tgl_buat' => $today,
-            'tgl_update' => $today
-        ]);
+        if ($record) {
+            $record->update([
+                'id_master_penghasilan' => $request->id_master_penghasilan,
+                'jumlah' => $request->jumlah,
+                'satuan' => $request->satuan,
+                'penghasilan' => $request->penghasilan,
+                'diekspor' => $request->diekspor,
+                'id_update' => Auth::user()->id,
+                'tgl_update' => $today
+            ]);
+            $idP1 = $record->id_individu_p1;
+        } else {
+            $idP1 = $request->id_individu_p1 ?? $id;
+        }
+
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $idP1,
+            'P204',
+            'individu_p204',
+            'id_individu_p1'
+        );
 
         return response()->json([
             'status' => true,
             'message' => 'Data Individu P204 berhasil di update',
-            'data' => $data
+            'data' => $record
         ]);
     }
 
     public function destroy($id)
     {
-        IdvP204M::findOrFail($id)->delete();
+        $record = IdvP204M::where('id', $id)->first();
+        if ($record) {
+            $idP1 = $record->id_individu_p1;
+            $record->delete();
+        } else {
+            // Jika ID yang dilempar adalah id_individu_p1
+            IdvP204M::where('id_individu_p1', $id)->delete();
+            $idP1 = $id;
+        }
+
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $idP1,
+            'P204',
+            'individu_p204',
+            'id_individu_p1'
+        );
 
         return response()->json([
             'status' => true,
@@ -115,6 +148,13 @@ class P204IdvApi extends Controller
     {
         try {
             \App\Models\Individu\P2\IdvP204M::where('id_individu_p1', $id_individu_p1)->delete();
+
+            app(\App\Services\SurveyProgressService::class)->syncProgress(
+                $id_individu_p1,
+                'P204',
+                'individu_p204',
+                'id_individu_p1'
+            );
 
             return response()->json([
                 'status' => true,

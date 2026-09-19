@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api\Rt;
+namespace App\Http\Controllers\Api\RT;
 
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
@@ -59,8 +59,20 @@ use App\Models\RT\P10\TransaksiLembagaMasyarakatP10RTM;
 
 class ExportRtController extends Controller
 {
-    public function export($idP4, $idP3)
+    public function export($idP4, $idP3 = null)
     {
+        $p4 = DB::table('rt_p4')->where('id', $idP4)->first();
+        if (!$p4) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Data RT tidak ditemukan',
+            ], 404);
+        }
+
+        if (!$idP3) {
+            $idP3 = $p4->id_p3_rw;
+        }
+
         $data = [
             'p2' => DB::table("rt_p2")
                 ->join("rt_p4", "rt_p2.id_p4", "=", "rt_p4.id")
@@ -86,7 +98,7 @@ class ExportRtController extends Controller
                     'desa.nama as nama_desa'
                 )
                 ->first(),
-            'p4' => DB::table('rt_p4')->where('id', $idP4)->first(),
+            'p4' => $p4,
             'p5' => DB::table('rt_p5')->where('id_p4', $idP4)->first(),
             'p6' => DB::table('rt_p6')->where('id_p4', $idP4)->first(),
             'p8' => DB::table('rt_p8')->where('id_p4', $idP4)->first(),
@@ -152,10 +164,17 @@ class ExportRtController extends Controller
         //     'data' => $data,
         // ]);
 
+        $rtNumber = isset($p4->rt) ? str_pad($p4->rt, 2, '0', STR_PAD_LEFT) : 'data';
+        $filename = "formulir_rt_{$rtNumber}.pdf";
+
         $pdf = Pdf::loadView('pages.rt.export', [
             'data' => $data
         ]);
 
-        return $pdf->stream('export.pdf');
+        if (request()->has('stream')) {
+            return $pdf->stream($filename);
+        }
+
+        return $pdf->download($filename);
     }
 }

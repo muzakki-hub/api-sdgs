@@ -19,6 +19,7 @@ class SurveyProgressService
         'id_p4',
         'id_p3_rw',
         'id_p3',
+        'id_individu_p1',
         'id_survey',
         'id_buat',
         'id_update',
@@ -161,6 +162,18 @@ class SurveyProgressService
                     unset($row['fungsi_hutan_konservasi'], $row['fungsi_hutan_lindung'], $row['fungsi_hutan_produksi']);
                 }
                 break;
+
+            case 'individu_p2':
+                if (isset($row['pekerjaan_utama']) && (string) $row['pekerjaan_utama'] !== '16') {
+                    unset($row['pekerjaan_lainnya']);
+                }
+                break;
+
+            case 'individu_p5':
+                if (isset($row['pendidikan_terakhir']) && (string) $row['pendidikan_terakhir'] !== '10') {
+                    unset($row['pendidikan_terakhir_lainnya']);
+                }
+                break;
         }
 
         return $row;
@@ -254,12 +267,92 @@ class SurveyProgressService
 
     /**
      * Ambil survey aktif saat ini berdasarkan tanggal hari ini.
+     * Jika tidak ada yang aktif pas di rentang tanggal, ambil survey terbaru.
      */
     public static function getActiveSurvey()
     {
         $today = \Carbon\Carbon::today()->toDateString();
-        return \App\Models\Survey\Survey::whereDate('tgl_mulai', '<=', $today)
+        $active = \App\Models\Survey\Survey::whereDate('tgl_mulai', '<=', $today)
             ->whereDate('tgl_akhir', '>=', $today)
             ->first();
+
+        if (!$active) {
+            $active = \App\Models\Survey\Survey::orderBy('tgl_akhir', 'desc')->first();
+        }
+
+        return $active;
+    }
+
+    /**
+     * Hitung statistik tingkat pendataan untuk level tertentu (RT, Keluarga, dll).
+     *
+     * @param string $level 'rt' | 'keluarga'
+     * @return array
+     */
+    public function getLevelDashboardStats(string $level = 'rt'): array
+    {
+        $level = strtolower($level);
+        $activeSurvey = self::getActiveSurvey();
+        $idSurvey = $activeSurvey?->id;
+
+        if ($level === 'keluarga' || $level === 'kg') {
+            $requiredForms = ['P4', 'P4.21', 'P4.22', 'P4.23', 'P4.24'];
+            $totalTarget = DB::table('kg_p2')->count();
+        } else {
+            // Default RT
+            $level = 'rt';
+            $requiredForms = [
+                'P2', 'P5', 'P502', 'P508', 'P6', 'P607', 'P609',
+                'P7', 'P706', 'P709', 'P713', 'P8', 'P801', 'P901',
+                'P902', 'P10', 'P1004', 'P1009', 'P11', 'P1101', 'P1102'
+            ];
+            $totalTarget = DB::table('rt_p4')->count();
+        }
+
+        // Entitas target yang sudah 100% instrumennya terverifikasi
+        $completedParents = DB::table('survey_progress')
+            ->when($idSurvey, fn($q) => $q->where('id_survey', $idSurvey))
+            ->whereIn('form_code', $requiredForms)
+            ->where('status_verifikasi', 'terverifikasi')
+            ->groupBy('id_parent')
+            ->havingRaw('COUNT(DISTINCT form_code) >= ?', [count($requiredForms)])
+            ->pluck('id_parent');
+
+        $statCompleted = $completedParents->count();
+
+        // Entitas target yang sudah mulai diisi/ditarik tapi belum 100% lengkap/terverifikasi
+        $inProgressParents = DB::table('survey_progress')
+            ->when($idSurvey, fn($q) => $q->where('id_survey', $idSurvey))
+            ->whereIn('form_code', $requiredForms)
+            ->where(function ($q) {
+                $q->where('skor_wajib', '>', 0)
+                  ->orWhere('skor_total', '>', 0)
+                  ->orWhere('status_verifikasi', '!=', 'belum_diisi');
+            })
+            ->whereNotIn('id_parent', $completedParents)
+            ->distinct('id_parent')
+            ->pluck('id_parent');
+
+        $statIncomplete = $inProgressParents->count();
+        $statNotStarted = max(0, $totalTarget - $statCompleted - $statIncomplete);
+        $progressPercent = $totalTarget > 0 ? (int) round(($statCompleted / $totalTarget) * 100) : 0;
+
+        $desa = DB::table('desa_p2')->select('nama_desa')->first();
+        $lokasi = $desa?->nama_desa ? $desa->nama_desa . ', Jogoroto' : 'Sumbermulyo, Jogoroto';
+
+        return [
+            'level' => $level,
+            'statTotal' => $totalTarget,
+            'statCompleted' => $statCompleted,
+            'statIncomplete' => $statIncomplete,
+            'statNotStarted' => $statNotStarted,
+            'progressPercent' => $progressPercent,
+            'lokasi' => $lokasi,
+            'survey' => [
+                'id' => $idSurvey,
+                'nama' => $activeSurvey?->nama_survey,
+                'tahun' => $activeSurvey?->tahun_survey,
+            ],
+        ];
     }
 }

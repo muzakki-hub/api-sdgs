@@ -38,7 +38,7 @@ class P4IdvApi extends Controller
             'tunanetra' => $request->tunanetra,
             'tunarungu' => $request->tunarungu,
             'tunawicara' => $request->tunawicara,
-            'tunarungu_wicara' => $request->{"tunarungu_wicara"}, // ← tambahkan ini
+            'tunarungu_wicara' => $request->{"tunarungu_wicara"},
             'tunadaksa' => $request->tunadaksa,
             'tunagrahita' => $request->tunagrahita,
             'tunalaras' => $request->tunalaras,
@@ -53,6 +53,13 @@ class P4IdvApi extends Controller
             'tgl_update' => $today
         ]);
 
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $request->id_individu_p1,
+            'P4',
+            'individu_p4',
+            'id_individu_p1'
+        );
+
         return response()->json([
             'status' => true,
             'message' => 'Data Individu P4 berhasil disimpan',
@@ -65,7 +72,14 @@ class P4IdvApi extends Controller
      */
     public function show($id)
     {
-        $data = IdvP4M::findOrFail($id);
+        $data = IdvP4M::where('id', $id)->orWhere('id_individu_p1', $id)->first();
+
+        if (!$data) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Data tidak ditemukan'
+            ], 404);
+        }
 
         return response()->json([
             'status' => true,
@@ -80,27 +94,39 @@ class P4IdvApi extends Controller
     public function update(Request $request, $id)
     {
         $today = Carbon::now();
+        $record = IdvP4M::where('id', $id)->orWhere('id_individu_p1', $id)->first();
 
-        $data = IdvP4M::where('id', $id)->update([
-            'tunanetra' => $request->tunanetra,
-            'tunarungu' => $request->tunarungu,
-            'tunawicara' => $request->tunawicara,
-            'tunarungu_wicara' => $request->{"tunarungu_wicara"}, // ← tambahkan ini
-            'tunadaksa' => $request->tunadaksa,
-            'tunagrahita' => $request->tunagrahita,
-            'tunalaras' => $request->tunalaras,
-            'cacat_eks_sakitkusta' => $request->cacat_eks_sakitkusta,
-            'cacat_ganda' => $request->cacat_ganda,
-            'dipasung' => $request->dipasung,
+        if ($record) {
+            $record->update([
+                'tunanetra' => $request->tunanetra,
+                'tunarungu' => $request->tunarungu,
+                'tunawicara' => $request->tunawicara,
+                'tunarungu_wicara' => $request->{"tunarungu_wicara"},
+                'tunadaksa' => $request->tunadaksa,
+                'tunagrahita' => $request->tunagrahita,
+                'tunalaras' => $request->tunalaras,
+                'cacat_eks_sakitkusta' => $request->cacat_eks_sakitkusta,
+                'cacat_ganda' => $request->cacat_ganda,
+                'dipasung' => $request->dipasung,
+                'id_update' => Auth::user()->id,
+                'tgl_update' => $today
+            ]);
+            $idP1 = $record->id_individu_p1;
+        } else {
+            $idP1 = $request->id_individu_p1 ?? $id;
+        }
 
-            'id_update' => Auth::user()->id,
-            'tgl_update' => $today
-        ]);
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $idP1,
+            'P4',
+            'individu_p4',
+            'id_individu_p1'
+        );
 
         return response()->json([
             'status' => true,
             'message' => 'Data Individu P4 berhasil diupdate',
-            'data' => $data
+            'data' => $record
         ]);
     }
 
@@ -109,7 +135,19 @@ class P4IdvApi extends Controller
      */
     public function destroy($id)
     {
-        IdvP4M::findOrFail($id)->delete();
+        $record = IdvP4M::where('id', $id)->orWhere('id_individu_p1', $id)->first();
+        $idP1 = $record ? $record->id_individu_p1 : $id;
+
+        if ($record) {
+            $record->delete();
+        }
+
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $idP1,
+            'P4',
+            'individu_p4',
+            'id_individu_p1'
+        );
 
         return response()->json([
             'status' => true,

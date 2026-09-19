@@ -46,6 +46,13 @@ class P401IdvApi extends Controller
             'tgl_update' => $today
         ]);
 
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $request->id_individu_p1,
+            'P401',
+            'individu_p401',
+            'id_individu_p1'
+        );
+
         return response()->json([
             'status' => true,
             'message' => 'Data P401 berhasil disimpan',
@@ -70,6 +77,7 @@ class P401IdvApi extends Controller
         $today = Carbon::now();
         $result = [];
         $counter = 1;
+        $idP1 = null;
         foreach ($request->data as $row) {
             // Cek setiap item wajib punya field yang dibutuhkan
             if (
@@ -82,6 +90,7 @@ class P401IdvApi extends Controller
                     'message' => 'Setiap item dalam data[] harus punya id_individu_p1, id_master_penyakit, status'
                 ], 422);
             }
+            $idP1 = $row['id_individu_p1'];
             $rand = random_int(10000, 99999);
 
             // id final <= 25 karakter
@@ -100,6 +109,15 @@ class P401IdvApi extends Controller
             ]);
 
             $result[] = $save;
+        }
+
+        if ($idP1) {
+            app(\App\Services\SurveyProgressService::class)->syncProgress(
+                $idP1,
+                'P401',
+                'individu_p401',
+                'id_individu_p1'
+            );
         }
 
         return response()->json([
@@ -165,6 +183,13 @@ class P401IdvApi extends Controller
             $counter++;
         }
 
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $id,
+            'P401',
+            'individu_p401',
+            'id_individu_p1'
+        );
+
         return response()->json([
             'status' => true,
             'message' => 'Data P401 berhasil diupdate',
@@ -209,6 +234,13 @@ class P401IdvApi extends Controller
             $counter++;
         }
 
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $id_p1,
+            'P401',
+            'individu_p401',
+            'id_individu_p1'
+        );
+
         return response()->json([
             'status' => true,
             'message' => 'Data P401 berhasil diupdate',
@@ -222,7 +254,22 @@ class P401IdvApi extends Controller
     // ======================================================
     public function destroy($id)
     {
-        IdvP401M::findOrFail($id)->delete();
+        $record = IdvP401M::where('id', $id)->first();
+        if ($record) {
+            $idP1 = $record->id_individu_p1;
+            $record->delete();
+        } else {
+            // Jika ID yang dikirim adalah id_individu_p1
+            IdvP401M::where('id_individu_p1', $id)->delete();
+            $idP1 = $id;
+        }
+
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $idP1,
+            'P401',
+            'individu_p401',
+            'id_individu_p1'
+        );
 
         return response()->json([
             'status' => true,
@@ -250,6 +297,13 @@ class P401IdvApi extends Controller
     {
         try {
             \App\Models\Individu\P4\IdvP401M::where('id_individu_p1', $id_individu_p1)->delete();
+
+            app(\App\Services\SurveyProgressService::class)->syncProgress(
+                $id_individu_p1,
+                'P401',
+                'individu_p401',
+                'id_individu_p1'
+            );
 
             return response()->json([
                 'status' => true,

@@ -50,6 +50,13 @@ class P5IdvApi extends Controller
             'tgl_update' => $today
         ]);
 
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $request->id_individu_p1,
+            'P5',
+            'individu_p5',
+            'id_individu_p1'
+        );
+
         return response()->json([
             'status' => true,
             'message' => 'Data Individu P5 berhasil disimpan',
@@ -58,7 +65,14 @@ class P5IdvApi extends Controller
     }
     public function show($id)
     {
-        $data = IdvP5M::findOrFail($id);
+        $data = IdvP5M::where('id', $id)->orWhere('id_individu_p1', $id)->first();
+
+        if (!$data) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Data tidak ditemukan'
+            ], 404);
+        }
 
         return response()->json([
             'status' => true,
@@ -71,28 +85,38 @@ class P5IdvApi extends Controller
     {
         try {
             $today = Carbon::now();
-            $data = IdvP5M::where('id', $id)->update([
-                'pendidikan_terakhir' => $request->pendidikan_terakhir,
-                // 'pendidikan_terakhir_lainnya' => $request->pendidikan_terakhir_lainnya,
-                'bahasa_rumah' => $request->bahasa_rumah,
-                'bahasa_formal' => $request->bahasa_formal,
-                'kerja_bakti' => $request->kerja_bakti,
-                'siskampling' => $request->siskampling,
-                'pesta_rakyat' => $request->pesta_rakyat,
-                'menolong_kematian' => $request->menolong_kematian,
-                'menolong_sakit' => $request->menolong_sakit,
-                'menolong_kecelakaan' => $request->menolong_kecelakaan,
+            $record = IdvP5M::where('id', $id)->orWhere('id_individu_p1', $id)->first();
 
-                // 'id_buat' => Auth::user()->id,
-                'id_update' => Auth::user()->id,
-                // 'tgl_buat' => $today,
-                'tgl_update' => $today
-            ]);
+            if ($record) {
+                $record->update([
+                    'pendidikan_terakhir' => $request->pendidikan_terakhir,
+                    'bahasa_rumah' => $request->bahasa_rumah,
+                    'bahasa_formal' => $request->bahasa_formal,
+                    'kerja_bakti' => $request->kerja_bakti,
+                    'siskampling' => $request->siskampling,
+                    'pesta_rakyat' => $request->pesta_rakyat,
+                    'menolong_kematian' => $request->menolong_kematian,
+                    'menolong_sakit' => $request->menolong_sakit,
+                    'menolong_kecelakaan' => $request->menolong_kecelakaan,
+                    'id_update' => Auth::user()->id,
+                    'tgl_update' => $today
+                ]);
+                $idP1 = $record->id_individu_p1;
+            } else {
+                $idP1 = $request->id_individu_p1 ?? $id;
+            }
+
+            app(\App\Services\SurveyProgressService::class)->syncProgress(
+                $idP1,
+                'P5',
+                'individu_p5',
+                'id_individu_p1'
+            );
 
             return response()->json([
                 'status' => true,
                 'message' => 'Data Individu P5 berhasil di update',
-                'data' => $data
+                'data' => $record
             ]);
         } catch (\Exception $e) {
             Log::error('Gagal update P5', [
@@ -110,7 +134,19 @@ class P5IdvApi extends Controller
 
     public function destroy($id)
     {
-        IdvP5M::findOrFail($id)->delete();
+        $record = IdvP5M::where('id', $id)->orWhere('id_individu_p1', $id)->first();
+        $idP1 = $record ? $record->id_individu_p1 : $id;
+
+        if ($record) {
+            $record->delete();
+        }
+
+        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            $idP1,
+            'P5',
+            'individu_p5',
+            'id_individu_p1'
+        );
 
         return response()->json([
             'status' => true,

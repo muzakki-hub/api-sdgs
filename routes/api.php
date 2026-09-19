@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\Individu\P4\P401IdvApi;
 use App\Http\Controllers\Api\Individu\P4\P402IdvApi;
 use App\Http\Controllers\Api\Individu\P4\P4IdvApi;
 use App\Http\Controllers\Api\Individu\P5\P5IdvApi;
+use App\Http\Controllers\Api\Individu\IdvprogressController;
 use App\Http\Controllers\Api\Keluarga\P2\P2Api;
 use App\Http\Controllers\Api\Keluarga\P3\P3Api;
 use App\Http\Controllers\Api\Keluarga\P4\P421Api;
@@ -82,6 +83,10 @@ Route::group([
     Route::get("logout", [ApiController::class, "logout"]);
     Route::get("refresh-token", [ApiController::class, "refreshToken"]);
 
+    // DASHBOARD STATS
+    Route::get('/dashboard/stats', [\App\Http\Controllers\Api\DashboardApiController::class, 'getStats']);
+    Route::get('/survey/transfer/options', [\App\Http\Controllers\Api\SurveyTransferController::class, 'getWilayahOptions']);
+
     // SURVEY
     Route::get('/survey/all', [SurveyApi::class, 'index']);
     Route::get('/survey/aktif', [SurveyApi::class, 'getSurveyAktif']);
@@ -150,6 +155,9 @@ Route::group([
         // INDIVIDU P5
         Route::resource('/p5', P5IdvApi::class);
         Route::get('/p5/by-p1/{id}', [P5IdvApi::class, 'showByIdP1']);
+
+        // INDIVIDU PROGRESS
+        Route::get('/progress/{idP1}', [IdvprogressController::class, 'getProgress']);
     });
     
     Route::prefix('master')->group(function () {
@@ -374,7 +382,8 @@ Route::prefix('rt')->middleware('auth:sanctum')->group(function () {
     Route::delete('/p1102/delete/all/{idP4}', [TransaksiKejahatanP11RtController::class, 'destroyAll']);
 
 
-    Route::get('/export/{idP4}/{idP3}', [ExportRtController::class, 'export']);
+    Route::get('/export/{idP4}/{idP3?}', [ExportRtController::class, 'export']);
+    Route::get('/p4/export/{idP4}', [ExportRtController::class, 'export']);
     Route::get('/progress/{idP4}', [RtprogressController::class, 'getProgress']);
     Route::post('/tarik-data-sebelumnya/{idP4}', [\App\Http\Controllers\Api\SurveyTransferController::class, 'tarikDataSebelumnyaRt']);
 

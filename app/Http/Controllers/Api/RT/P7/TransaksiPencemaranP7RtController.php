@@ -54,19 +54,31 @@ class TransaksiPencemaranP7RtController extends Controller
             $validated['pengaduan_warga'] =  null;
         }
 
-        $id = 'P709-' . strtotime(now());
-
         try {
-            TransaksiPencemaranP7RTM::create(array_merge($validated, [
-                'id'         => $id,
-                'id_survey' => $survey->id,
-                'id_buat' => $userId,
-                'id_update' => $userId,
-'tgl_buat'   => now(),
-                'tgl_update' => null,
-            ]));
+            $existing = TransaksiPencemaranP7RTM::where('id_p4', $validated['id_p4'])
+                ->where('id_master_lingkungan', $validated['id_master_lingkungan'])
+                ->where('id_survey', $survey->id)
+                ->first();
 
-                        app(\App\Services\SurveyProgressService::class)->syncProgress(
+            if ($existing) {
+                $existing->update(array_merge($validated, [
+                    'id_update' => $userId,
+                    'tgl_update' => now(),
+                ]));
+                $id = $existing->id;
+            } else {
+                $id = 'P709-' . strtotime(now());
+                TransaksiPencemaranP7RTM::create(array_merge($validated, [
+                    'id'         => $id,
+                    'id_survey'  => $survey->id,
+                    'id_buat'    => $userId,
+                    'id_update'  => $userId,
+                    'tgl_buat'   => now(),
+                    'tgl_update' => null,
+                ]));
+            }
+
+            app(\App\Services\SurveyProgressService::class)->syncProgress(
                 $validated['id_p4'],
                 'P709',
                 'transaksi_pencemaran_p7_rt',
@@ -83,7 +95,7 @@ class TransaksiPencemaranP7RtController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
-                'message' => 'Gagal menyimpan data RT P709: ' . $e->getMessage(),
+                'message' => 'Gagal menyimpan data RT 709: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -180,9 +192,12 @@ class TransaksiPencemaranP7RtController extends Controller
     public function destroy($idP4, $idMasterLingkungan)
     {
         $survey = SurveyProgressService::getActiveSurvey();
-        $data = TransaksiPencemaranP7RTM::where('id_p4', $idP4)->where('id_master_lingkungan', $idMasterLingkungan)->where('id_survey', $survey?->id)->first();
+        $surveyId = $survey?->id;
 
-        if (!$data) {
+        $query = TransaksiPencemaranP7RTM::where('id_p4', $idP4)
+            ->where('id_master_lingkungan', $idMasterLingkungan);
+
+        if ($query->count() === 0) {
             return response()->json([
                 'status' => false,
                 'message' => 'Data RT P709 tidak ditemukan',
@@ -190,8 +205,7 @@ class TransaksiPencemaranP7RtController extends Controller
         }
 
         try {
-                        $surveyId = $data->id_survey ?? $survey?->id;
-            $data->delete();
+            $query->delete();
 
             app(\App\Services\SurveyProgressService::class)->syncProgress(
                 $idP4,

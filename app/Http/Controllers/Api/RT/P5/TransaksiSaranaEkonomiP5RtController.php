@@ -41,17 +41,29 @@ class TransaksiSaranaEkonomiP5RtController extends Controller
             'kemudahan_mencapai' => 'required|in:1,2,3,4',
         ]);
 
-        $id = 'P508-' . strtotime(now());
-
         try {
-            TransaksiSaranaEkonomiP5RTM::create(array_merge($validated, [
-                'id'         => $id,
-                'id_survey' => $survey->id,
-                'id_buat' => $userId,
-                'id_update' => $userId,
-'tgl_buat'   => now(),
-                'tgl_update' => null,
-            ]));
+            $existing = TransaksiSaranaEkonomiP5RTM::where('id_p4', $validated['id_p4'])
+                ->where('id_master_sarana_ekonomi', $validated['id_master_sarana_ekonomi'])
+                ->where('id_survey', $survey->id)
+                ->first();
+
+            if ($existing) {
+                $existing->update(array_merge($validated, [
+                    'id_update' => $userId,
+                    'tgl_update' => now(),
+                ]));
+                $id = $existing->id;
+            } else {
+                $id = 'P508-' . strtotime(now());
+                TransaksiSaranaEkonomiP5RTM::create(array_merge($validated, [
+                    'id'         => $id,
+                    'id_survey'  => $survey->id,
+                    'id_buat'    => $userId,
+                    'id_update'  => $userId,
+                    'tgl_buat'   => now(),
+                    'tgl_update' => null,
+                ]));
+            }
 
                         app(\App\Services\SurveyProgressService::class)->syncProgress(
                 $validated['id_p4'],
@@ -157,9 +169,12 @@ class TransaksiSaranaEkonomiP5RtController extends Controller
     public function destroy($idP4, $idMasterSaranaEkonomi)
     {
         $survey = SurveyProgressService::getActiveSurvey();
-        $data = TransaksiSaranaEkonomiP5RTM::where('id_p4', $idP4)->where('id_master_sarana_ekonomi', $idMasterSaranaEkonomi)->where('id_survey', $survey?->id)->first();
+        $surveyId = $survey?->id;
 
-        if (!$data) {
+        $query = TransaksiSaranaEkonomiP5RTM::where('id_p4', $idP4)
+            ->where('id_master_sarana_ekonomi', $idMasterSaranaEkonomi);
+
+        if ($query->count() === 0) {
             return response()->json([
                 'status' => false,
                 'message' => 'Data RT P508 tidak ditemukan',
@@ -167,8 +182,7 @@ class TransaksiSaranaEkonomiP5RtController extends Controller
         }
 
         try {
-                        $surveyId = $data->id_survey ?? $survey?->id;
-            $data->delete();
+            $query->delete();
 
             app(\App\Services\SurveyProgressService::class)->syncProgress(
                 $idP4,
