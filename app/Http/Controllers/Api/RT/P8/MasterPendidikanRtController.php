@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\RT\P8;
 
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use App\Models\Survey\Survey;
 use App\Http\Controllers\Controller;
 use App\Models\Master\MasterPendidikanRTM;
@@ -53,6 +54,8 @@ class MasterPendidikanRtController extends Controller
 
             MasterPendidikanRTM::create(array_merge($validated, [
                 'id'         => $id,
+                'id_buat'    => Auth::id() ?? $request->user()?->id ?? auth('sanctum')->id(),
+                'id_update'  => Auth::id() ?? $request->user()?->id ?? auth('sanctum')->id(),
                 'tgl_buat'   => now(),
                 'tgl_update' => null,
             ]));

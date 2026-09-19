@@ -10,6 +10,7 @@ use App\Models\Survey\Survey;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Auth\Events\Validated;
 
 class P3RtController extends Controller
@@ -141,10 +142,20 @@ class P3RtController extends Controller
             ], 409);
         }
 
+        $userId = Auth::id() ?? $request->user()?->id ?? auth('sanctum')->id();
+        if (!$userId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Sesi tidak valid atau pengguna belum login.',
+            ], 401);
+        }
+
         $id = 'RTP3-' . strtotime(now());
 
         $data = RtP3M::create(array_merge($validated, [
             'id'         => $id,
+            'id_buat'    => $userId,
+            'id_update'  => $userId,
             'tgl_buat'   => now(),
             'tgl_update' => null,
             'id_survey'  => $survey->id,
@@ -321,7 +332,10 @@ class P3RtController extends Controller
         ->except('foto_ket_rw')
         ->toArray();
 
+    $userId = Auth::id() ?? $request->user()?->id ?? auth('sanctum')->id();
+
     $data->update(array_merge($updateData, [
+        'id_update'  => $userId,
         'tgl_update' => now(),
     ]));
 

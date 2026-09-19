@@ -65,6 +65,8 @@ class MasterBencanaAlamRtController extends Controller
 
             MasterBencanaAlamRTM::create(array_merge($validated, [
                 'id'         => $id,
+                'id_buat'    => Auth::id() ?? $request->user()?->id ?? auth('sanctum')->id(),
+                'id_update'  => Auth::id() ?? $request->user()?->id ?? auth('sanctum')->id(),
                 'tgl_buat'   => now(),
                 'tgl_update' => null,
             ]));

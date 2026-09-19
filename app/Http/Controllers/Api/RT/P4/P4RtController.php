@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 
 class P4RtController extends Controller
 {
@@ -91,12 +92,20 @@ class P4RtController extends Controller
             ], 409);
         }
 
+        $userId = Auth::id() ?? $request->user()?->id ?? auth('sanctum')->id();
+        if (!$userId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Sesi tidak valid atau pengguna belum login.',
+            ], 401);
+        }
+
         $id = 'RTP4-' . strtotime(now());
-
-
 
         RtP4M::create(array_merge($validated, [
             'id'         => $id,
+            'id_buat'    => $userId,
+            'id_update'  => $userId,
             'tgl_buat'   => now(),
             'tgl_update' => null,
         ]));
@@ -216,7 +225,10 @@ class P4RtController extends Controller
             ], 409);
         }
 
+        $userId = Auth::id() ?? $request->user()?->id ?? auth('sanctum')->id();
+
         $data->update(array_merge($validated, [
+            'id_update'  => $userId,
             'tgl_update' => now(),
         ]));
 
