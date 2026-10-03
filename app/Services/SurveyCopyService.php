@@ -164,18 +164,74 @@ class SurveyCopyService
             return ['status' => false, 'message' => 'Tidak ditemukan data survei sebelumnya untuk ditarik.'];
         }
 
+        $currentP2 = DB::table('kg_p2')->where('id', $idP2)->first();
+        if (!$currentP2) {
+            return ['status' => false, 'message' => 'Data keluarga tidak ditemukan.'];
+        }
+
         $userId = $userId ?? Auth::id() ?? 'SYSTEM';
         $now = now();
         $totalCopied = 0;
 
         DB::beginTransaction();
         try {
+            // Tentukan target P2 di survei aktif dan source P2 di survei sebelumnya
+            $targetIdP2 = $idP2;
+            $prevP2 = null;
+
+            if ($currentP2->id_survey === $activeSurvey->id) {
+                // Keluarga sudah berada di survei aktif, cari keluarga lama berdasarkan no_kk
+                if (!empty($currentP2->no_kk)) {
+                    $prevP2 = DB::table('kg_p2')
+                        ->where('id_survey', $prevSurvey->id)
+                        ->where('no_kk', $currentP2->no_kk)
+                        ->first();
+                }
+            } else {
+                // Entitas P2 berasal dari survei sebelumnya (misal saat bulk pull dari list survei lama)
+                $prevP2 = $currentP2;
+                $activeExisting = DB::table('kg_p2')
+                    ->where('id_survey', $activeSurvey->id)
+                    ->where('no_kk', $currentP2->no_kk)
+                    ->first();
+
+                if (!$activeExisting) {
+                    $targetIdP2 = 'KGP2-' . strtotime(now()) . rand(100, 999);
+                    $newP2Data = (array) $currentP2;
+                    $newP2Data['id'] = $targetIdP2;
+                    $newP2Data['id_survey'] = $activeSurvey->id;
+                    $newP2Data['id_buat'] = $userId;
+                    $newP2Data['id_update'] = $userId;
+                    $newP2Data['tgl_buat'] = $now;
+                    $newP2Data['tgl_update'] = $now;
+                    DB::table('kg_p2')->insert($newP2Data);
+                    $totalCopied++;
+                } else {
+                    $targetIdP2 = $activeExisting->id;
+                }
+            }
+
+            // Kumpulan ID sumber di survei sebelumnya
+            $sourceIdP2s = array_values(array_unique(array_filter([$idP2, $prevP2?->id])));
+
+            // Salin data meteran rumah jika di survei aktif masih belum terisi
+            if ($prevP2 && ($currentP2->meteran_rumah === null || $currentP2->meteran_rumah === '')) {
+                DB::table('kg_p2')->where('id', $targetIdP2)->update([
+                    'meteran_rumah' => $prevP2->meteran_rumah,
+                    'no_meteran' => $prevP2->no_meteran,
+                    'daya_meteran_rumah' => $prevP2->daya_meteran_rumah,
+                    'atas_nama' => $prevP2->atas_nama ?? null,
+                    'tgl_update' => $now,
+                ]);
+            }
+
             // 1. kg_p3
-            if (!DB::table('kg_p3')->where('id_kg_p2', $idP2)->where('id_survey', $activeSurvey->id)->exists()) {
-                $prevP3 = DB::table('kg_p3')->where('id_kg_p2', $idP2)->where('id_survey', $prevSurvey->id)->first();
+            if (!DB::table('kg_p3')->where('id_kg_p2', $targetIdP2)->where('id_survey', $activeSurvey->id)->exists()) {
+                $prevP3 = DB::table('kg_p3')->whereIn('id_kg_p2', $sourceIdP2s)->where('id_survey', $prevSurvey->id)->first();
                 if ($prevP3) {
                     $d = (array) $prevP3;
                     $d['id'] = 'KG-' . strtotime(now()) . rand(100, 999);
+                    $d['id_kg_p2'] = $targetIdP2;
                     $d['id_survey'] = $activeSurvey->id;
                     $d['is_verified'] = 0;
                     $d['id_buat'] = $userId;
@@ -188,11 +244,12 @@ class SurveyCopyService
             }
 
             // 2. kg_p4
-            if (!DB::table('kg_p4')->where('id_kg_p2', $idP2)->where('id_survey', $activeSurvey->id)->exists()) {
-                $prevP4 = DB::table('kg_p4')->where('id_kg_p2', $idP2)->where('id_survey', $prevSurvey->id)->first();
+            if (!DB::table('kg_p4')->where('id_kg_p2', $targetIdP2)->where('id_survey', $activeSurvey->id)->exists()) {
+                $prevP4 = DB::table('kg_p4')->whereIn('id_kg_p2', $sourceIdP2s)->where('id_survey', $prevSurvey->id)->first();
                 if ($prevP4) {
                     $d = (array) $prevP4;
                     $d['id'] = 'KGP4-' . strtotime(now()) . rand(100, 999);
+                    $d['id_kg_p2'] = $targetIdP2;
                     $d['id_survey'] = $activeSurvey->id;
                     $d['is_verified'] = 0;
                     $d['id_buat'] = $userId;
@@ -213,14 +270,15 @@ class SurveyCopyService
             ];
 
             foreach ($subTables as $table => $cfg) {
-                $prevRows = DB::table($table)->where('id_kg_p2', $idP2)->where('id_survey', $prevSurvey->id)->get();
+                $prevRows = DB::table($table)->whereIn('id_kg_p2', $sourceIdP2s)->where('id_survey', $prevSurvey->id)->get();
                 foreach ($prevRows as $prevRow) {
                     $masterVal = $prevRow->{$cfg['master']};
-                    if (DB::table($table)->where('id_kg_p2', $idP2)->where('id_survey', $activeSurvey->id)->where($cfg['master'], $masterVal)->exists()) {
+                    if (DB::table($table)->where('id_kg_p2', $targetIdP2)->where('id_survey', $activeSurvey->id)->where($cfg['master'], $masterVal)->exists()) {
                         continue;
                     }
                     $d = (array) $prevRow;
-                    $d['id'] = substr($cfg['prefix'] . md5($idP2 . $masterVal . $activeSurvey->id), 0, 25);
+                    $d['id'] = substr($cfg['prefix'] . md5($targetIdP2 . $masterVal . $activeSurvey->id), 0, 25);
+                    $d['id_kg_p2'] = $targetIdP2;
                     $d['id_survey'] = $activeSurvey->id;
                     $d['is_verified'] = 0;
                     $d['id_buat'] = $userId;
@@ -236,14 +294,18 @@ class SurveyCopyService
 
             // Sync progress keluarga
             $progressService = app(SurveyProgressService::class);
-            $progressService->syncProgress($idP2, 'P4', 'kg_p4', 'id_kg_p2', [], $activeSurvey->id);
+            $progressService->syncProgress($targetIdP2, 'P4', 'kg_p4', 'id_kg_p2', [], $activeSurvey->id);
             foreach ($subTables as $table => $cfg) {
-                $progressService->syncProgress($idP2, $cfg['code'], $table, 'id_kg_p2', [], $activeSurvey->id);
+                $progressService->syncProgress($targetIdP2, $cfg['code'], $table, 'id_kg_p2', [], $activeSurvey->id);
             }
+
+            $message = $totalCopied > 0
+                ? "Berhasil menarik {$totalCopied} data instrumen Keluarga dari survei sebelumnya ({$prevSurvey->deskripsi})."
+                : "Tidak ada data instrumen baru yang perlu ditarik dari survei sebelumnya ({$prevSurvey->deskripsi}).";
 
             return [
                 'status' => true,
-                'message' => "Berhasil menarik {$totalCopied} data instrumen Keluarga dari survei sebelumnya ({$prevSurvey->deskripsi}).",
+                'message' => $message,
                 'total_copied' => $totalCopied,
                 'source_survey' => $prevSurvey->id,
             ];

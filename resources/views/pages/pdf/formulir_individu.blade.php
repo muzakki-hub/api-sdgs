@@ -64,6 +64,10 @@
 </head>
 <body>
 
+@if(isset($cover))
+    @include('pages.pdf.partials.cover', ['cover' => $cover])
+@endif
+
 {{-- =================================== --}}
 {{-- P1 --}}
 {{-- =================================== --}}
@@ -74,6 +78,23 @@
         <tr><th class="code">P101</th><th class="label">Nomor KK</th><td class="value">: {{ $p1->no_kk ?? '-' }}</td></tr>
         <tr><th class="code">P102</th><th class="label">NIK</th><td class="value">: {{ $p1->nik ?? '-' }}</td></tr>
         <tr><th class="code">P103</th><th class="label">Nama</th><td class="value">: {{ $p1->nama ?? '-' }}</td></tr>
+        @php
+            $shdkMap = [
+                1 => 'Kepala Keluarga',
+                2 => 'Suami',
+                3 => 'Istri',
+                4 => 'Anak',
+                5 => 'Menantu',
+                6 => 'Cucu',
+                7 => 'Orangtua',
+                8 => 'Mertua',
+                9 => 'Famili Lain',
+                10 => 'Lainnya',
+            ];
+            $shdkVal = $p1->status_hubungan_keluarga ?? null;
+            $shdkText = $shdkMap[$shdkVal] ?? ($shdkVal ?: '-');
+        @endphp
+        <tr><th class="code">P103A</th><th class="label">Hubungan dgn KK</th><td class="value">: {{ $shdkText }}</td></tr>
 
         <tr>
             <th class="code">P104</th>
@@ -120,10 +141,10 @@
 
         <tr><th class="code">P111</th><th class="label">Nomor HP</th><td class="value">: {{ $p1->no_hp ?? '-' }}</td></tr>
         <tr><th class="code">P112</th><th class="label">Whatsapp</th><td class="value">: {{ $p1->no_wa ?? '-' }}</td></tr>
-        <tr><th class="code">P113</th><th class="label">Email</th><td class="value">: {{ $p1->email ?? '-' }}</td></tr>
-        <tr><th class="code">P114</th><th class="label">Facebook</th><td class="value">: {{ $p1->facebook ?? '-' }}</td></tr>
-        <tr><th class="code">P115</th><th class="label">Twitter</th><td class="value">: {{ $p1->twitter ?? '-' }}</td></tr>
-        <tr><th class="code">P116</th><th class="label">Instagram</th><td class="value">: {{ $p1->instagram ?? '-' }}</td></tr>
+        <tr><th class="code">P113</th><th class="label">Email</th><td class="value">: {{ $p1->url_email_pribadi ?? $p1->email ?? '-' }}</td></tr>
+        <tr><th class="code">P114</th><th class="label">Facebook</th><td class="value">: {{ $p1->url_facebook_pribadi ?? $p1->facebook ?? '-' }}</td></tr>
+        <tr><th class="code">P115</th><th class="label">Twitter</th><td class="value">: {{ $p1->url_twitter_pribadi ?? $p1->twitter ?? '-' }}</td></tr>
+        <tr><th class="code">P116</th><th class="label">Instagram</th><td class="value">: {{ $p1->url_instagram_pribadi ?? $p1->instagram ?? '-' }}</td></tr>
     </table>
 </div>
 
@@ -161,7 +182,7 @@
                     ];
                 @endphp
 
-                : {{ $pu[$p2?->pekerjaan_utama] ?? ($p2?->pekerjaan_lainnya ?? '-') }}
+                : {{ ($p2?->pekerjaan_utama == 16 && !empty($p2?->pekerjaan_lainnya)) ? $p2->pekerjaan_lainnya : ($pu[$p2?->pekerjaan_utama] ?? '-') }}
             </td>
         </tr>
 
@@ -338,7 +359,7 @@
         <tr>
             <th class="code">P501</th>
             <th class="label">Pendidikan tertinggi</th>
-            <td class="value">: {{ $pd[$p5?->pendidikan_terakhir] ?? '-' }}</td>
+            <td class="value">: {{ ($p5?->pendidikan_terakhir == 10 && !empty($p5?->pendidikan_terakhir_lainnya)) ? $p5->pendidikan_terakhir_lainnya : ($pd[$p5?->pendidikan_terakhir] ?? '-') }}</td>
         </tr>
 
         {{-- P502 --}}

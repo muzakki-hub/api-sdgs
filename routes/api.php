@@ -80,12 +80,22 @@ Route::group([
     "middleware" => ["auth:sanctum"]
 ], function () {
     Route::get("getuser", [ApiController::class, "getdatauser"]);
+    Route::post("/update-profile", [ApiController::class, "updateProfile"]);
     Route::get("logout", [ApiController::class, "logout"]);
     Route::get("refresh-token", [ApiController::class, "refreshToken"]);
 
     // DASHBOARD STATS
     Route::get('/dashboard/stats', [\App\Http\Controllers\Api\DashboardApiController::class, 'getStats']);
     Route::get('/survey/transfer/options', [\App\Http\Controllers\Api\SurveyTransferController::class, 'getWilayahOptions']);
+
+    // ADMIN USER & TERRITORY MANAGEMENT
+    Route::get('/admin/users', [\App\Http\Controllers\Api\Admin\AdminUserController::class, 'index']);
+    Route::post('/admin/users', [\App\Http\Controllers\Api\Admin\AdminUserController::class, 'store']);
+    Route::get('/admin/users/{id}', [\App\Http\Controllers\Api\Admin\AdminUserController::class, 'show']);
+    Route::put('/admin/users/{id}', [\App\Http\Controllers\Api\Admin\AdminUserController::class, 'update']);
+    Route::delete('/admin/users/{id}', [\App\Http\Controllers\Api\Admin\AdminUserController::class, 'destroy']);
+    Route::get('/admin/surveyors', [\App\Http\Controllers\Api\Admin\AdminTerritoryController::class, 'getSurveyors']);
+    Route::post('/admin/surveyors/{id}/wilayah', [\App\Http\Controllers\Api\Admin\AdminTerritoryController::class, 'updateWilayah']);
 
     // SURVEY
     Route::get('/survey/all', [SurveyApi::class, 'index']);
@@ -115,6 +125,7 @@ Route::group([
         Route::get('/p424/by-p2/{id}', [P424Api::class, 'showByIdP2']);
         Route::get('/progress/{idP2}', [KgprogressController::class, 'getProgress']);
         Route::post('/tarik-data-sebelumnya/{idP2}', [\App\Http\Controllers\Api\SurveyTransferController::class, 'tarikDataSebelumnyaKg']);
+        Route::get('/p2/export/{id}', [FormulirKgController::class, 'download']);
     });
 
 
@@ -135,6 +146,10 @@ Route::group([
             [P204IdvApi::class, 'deleteAllByP1']
         );
         // INDIVIDU P4
+        Route::get('/p4/master', [P4IdvApi::class, 'master']);
+        Route::get('/p4/show-field/{idP1}/{field}', [P4IdvApi::class, 'showField']);
+        Route::post('/p4/save-field', [P4IdvApi::class, 'saveField']);
+        Route::delete('/p4/delete-field/{field}/{idP1}', [P4IdvApi::class, 'deleteField']);
         Route::resource('/p4', P4IdvApi::class);
         Route::get('/p4/by-p1/{id}', [P4IdvApi::class, 'showByIdP1']);
 

@@ -23,6 +23,7 @@
                                  <th>Username</th>
                                  <th>Nomer Hp</th>
                                  <th>Jabatan</th>
+                                 <th>Wilayah Tugas</th>
                                  <th>Status Akun</th>
                                  <th>Aksi</th>
                              </tr>
@@ -34,6 +35,13 @@
                                      <td>{{ $user->username }}</td>
                                      <td>{{ $user->hp }}</td>
                                      <td>{{ $user->jabatan ? $user->jabatan->nama_jabatan : '-' }}</td>
+                                     <td>
+                                         @if($user->rw_tugas)
+                                             <span class="badge badge-info">RW {{ $user->rw_tugas }}{{ $user->rt_tugas ? ' / RT ' . $user->rt_tugas : '' }}</span>
+                                         @else
+                                             <span class="badge badge-secondary">Bebas</span>
+                                         @endif
+                                     </td>
                                      <td>{{ $user->status == 'Y' ? 'Aktif' : 'Nonaktif' }}</td>
                                      <td>
                                          <button type="button" class="btn btn-sm btn-warning btn-edit-user"
@@ -41,7 +49,10 @@
                                              data-username="{{ $user->username }}" data-hp="{{ $user->hp }}"
                                              data-id_jabatan="{{ $user->id_jabatan }}" data-status="{{ $user->status }}"
                                              data-is_logged_in="{{ $user->is_logged_in }}"
-                                             data-alamat="{{ $user->alamat }}" data-toggle="modal"
+                                             data-alamat="{{ $user->alamat }}"
+                                             data-rw_tugas="{{ $user->rw_tugas }}"
+                                             data-rt_tugas="{{ $user->rt_tugas }}"
+                                             data-toggle="modal"
                                              data-target="#modalEditUser">
                                              Edit
                                          </button>
@@ -76,7 +87,7 @@
                          </button>
                      </div>
                      <div class="modal-body">
-                         @if ($errors->any())
+                         @if (isset($errors) && $errors?->any())
                              <div class="alert alert-danger">
                                  <ul>
                                      @foreach ($errors->all() as $error)
@@ -119,6 +130,17 @@
                                      <option value="Y">Aktif</option>
                                      <option value="N">Nonaktif</option>
                                  </select>
+                             </div>
+                             {{-- Wilayah Penugasan --}}
+                             <div class="row">
+                                 <div class="col-sm-6 mb-3">
+                                     <label>RW Tugas</label>
+                                     <input type="text" name="rw_tugas" class="form-control" placeholder="Contoh: 001 (kosongkan jika bebas)">
+                                 </div>
+                                 <div class="col-sm-6 mb-3">
+                                     <label>RT Tugas</label>
+                                     <input type="text" name="rt_tugas" class="form-control" placeholder="Contoh: 002 (opsional)">
+                                 </div>
                              </div>
                              {{-- Foto --}}
                              <div class="mb-3">
@@ -196,6 +218,17 @@
                                          <option value="0">Nonaktif</option>
                                      </select>
                                  </div>
+                                 {{-- Wilayah Penugasan --}}
+                                 <div class="row">
+                                     <div class="col-sm-6 mb-3">
+                                         <label>RW Tugas</label>
+                                         <input type="text" name="rw_tugas" id="edit_rw_tugas" class="form-control" placeholder="Kosongkan jika bebas">
+                                     </div>
+                                     <div class="col-sm-6 mb-3">
+                                         <label>RT Tugas</label>
+                                         <input type="text" name="rt_tugas" id="edit_rt_tugas" class="form-control" placeholder="Opsional">
+                                     </div>
+                                 </div>
                                  {{-- Alamat --}}
                                  <label for="alamat" class="font-weight-bold">Alamat</label>
                                  <textarea name="alamat" id="edit_alamat" class="form-control" cols="30" rows="10"></textarea>
@@ -235,6 +268,8 @@
                  var status = button.data('status');
                  var alamat = button.data('alamat');
                  var is_logged_in = button.data('is_logged_in');
+                 var rw_tugas = button.data('rw_tugas') || '';
+                 var rt_tugas = button.data('rt_tugas') || '';
 
                  $('#formEditUser').attr('action', '{{ url('/userweb') }}/' + id);
                  $('#edit_nama').val(nama);
@@ -244,6 +279,8 @@
                  $('#edit_status').val(status);
                  $('#edit_alamat').val(alamat);
                  $('#edit_is_logged_in').val(is_logged_in);
+                 $('#edit_rw_tugas').val(rw_tugas);
+                 $('#edit_rt_tugas').val(rt_tugas);
 
                  // HAPUS pengisian password dari sini
              });

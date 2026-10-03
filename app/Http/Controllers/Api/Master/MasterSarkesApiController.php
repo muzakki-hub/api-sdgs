@@ -9,9 +9,18 @@ use Illuminate\Http\Request;
 
 class MasterSarkesApiController extends Controller
 {
-     public function index()
+     public function index(Request $request)
     {
-        $data = MasterSarkesM::orderBy('nama_sarkes')->get();
+        $idP1 = $request->query('id_individu_p1') ?? $request->query('idP1');
+        $query = MasterSarkesM::select('id', 'nama_sarkes');
+
+        if ($idP1) {
+            $query->with(['transaksi' => function ($q) use ($idP1) {
+                $q->where('id_individu_p1', $idP1)->select('id', 'id_individu_p1', 'id_master_sarkes');
+            }]);
+        }
+
+        $data = $query->orderBy('nama_sarkes')->get();
 
         return response()->json([
             'status' => true,

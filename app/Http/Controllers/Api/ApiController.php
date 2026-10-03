@@ -117,9 +117,13 @@ class ApiController extends Controller
                 "hp" => $user->hp,
                 "email" => $user->email ?? null,
                 "nama" => $user->nama ?? null,
+                "id_jabatan" => $user->id_jabatan,
                 "jabatan" => $user->jabatan ? $user->jabatan->nama_jabatan : null,
+                "rw_tugas" => $user->rw_tugas ? (string)$user->rw_tugas : null,
+                "rt_tugas" => $user->rt_tugas ? (string)$user->rt_tugas : null,
                 "status" => $user->status,
                 "alamat" => $user->alamat,
+                "tanda_tangan" => $user->tanda_tangan ? asset($user->tanda_tangan) : null,
             ]
         ]);
     }
@@ -174,5 +178,99 @@ class ApiController extends Controller
             "message" => "Token Diperbarui",
             "access_token" => $newToken
         ]);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user() ?? auth('sanctum')->user() ?? Auth::user();
+
+        if (!$user) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Unauthenticated',
+            ], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'nama' => 'nullable|string|max:255',
+            'hp' => 'sometimes|nullable|string|max:50',
+            'alamat' => 'sometimes|nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => $validator->errors()->first(),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if (empty($user->tanda_tangan) && !$request->filled('tanda_tangan') && !$request->hasFile('tanda_tangan_file')) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Tanda tangan digital wajib dibuat atau diunggah.',
+                'errors' => ['tanda_tangan' => ['Tanda tangan digital wajib dibuat atau diunggah.']],
+            ], 422);
+        }
+
+        if ($request->filled('nama')) {
+            $user->nama = trim($request->nama);
+        }
+        if ($request->filled('hp')) {
+            $user->hp = trim($request->hp);
+        }
+        if ($request->filled('alamat')) {
+            $user->alamat = trim($request->alamat);
+        }
+
+        // Handle tanda tangan digital (base64 dari canvas atau upload file)
+        if ($request->filled('tanda_tangan')) {
+            $ttdData = $request->tanda_tangan;
+            if (preg_match('/^data:image\/(\w+);base64,/', $ttdData, $type)) {
+                $ttdData = substr($ttdData, strpos($ttdData, ',') + 1);
+                $ttdDecoded = base64_decode($ttdData);
+                if ($ttdDecoded !== false) {
+                    $dir = public_path('uploads/ttd');
+                    if (!file_exists($dir)) {
+                        mkdir($dir, 0775, true);
+                    }
+                    $filename = 'ttd_' . $user->id . '_' . time() . '.png';
+                    file_put_contents($dir . '/' . $filename, $ttdDecoded);
+                    $user->tanda_tangan = 'uploads/ttd/' . $filename;
+                }
+            }
+        } elseif ($request->hasFile('tanda_tangan_file')) {
+            $file = $request->file('tanda_tangan_file');
+            $dir = public_path('uploads/ttd');
+            if (!file_exists($dir)) {
+                mkdir($dir, 0775, true);
+            }
+            $filename = 'ttd_' . $user->id . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $file->move($dir, $filename);
+            $user->tanda_tangan = 'uploads/ttd/' . $filename;
+        }
+
+        $user->save();
+
+        // Reload relasi jabatan
+        $userData = $user->load('jabatan');
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Profil berhasil diperbarui.',
+            'data' => $userData,
+            'user' => [
+                'id' => $user->id,
+                'username' => $user->username,
+                'hp' => $user->hp,
+                'email' => $user->email ?? null,
+                'nama' => $user->nama ?? null,
+                'jabatan' => $user->jabatan ? $user->jabatan->nama_jabatan : null,
+                'status' => $user->status,
+                'alamat' => $user->alamat,
+                'tanda_tangan' => $user->tanda_tangan ? asset($user->tanda_tangan) : null,
+            ],
+            'nama_jabatan' => optional($userData->jabatan)->nama_jabatan,
+        ], 200);
     }
 }

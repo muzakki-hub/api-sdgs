@@ -19,7 +19,7 @@ class IdvprogressController extends Controller
      * Hitung progress survei individu berdasarkan id_individu_p1 (idP1)
      * Mengembalikan status penyelesaian 6 instrumen kuesioner individu:
      * - P2   : Deskripsi Pekerjaan (individu_p2)
-     * - P204 : Sumber Penghasilan Tambahan (individu_p204)
+     * - P204 : Sumber Penghasilan Setahun Terakhir (individu_p204)
      * - P4   : Kesehatan dan Disabilitas (individu_p4)
      * - P401 : Penyakit yang Diderita (individu_p401)
      * - P402 : Fasilitas Kesehatan yang Digunakan (individu_p402)
@@ -36,15 +36,9 @@ class IdvprogressController extends Controller
             ],
             [
                 'option'      => 'P204',
-                'description' => 'Sumber Penghasilan Tambahan',
+                'description' => 'Sumber Penghasilan Setahun Terakhir',
                 'select'      => true,
                 'table'       => 'individu_p204',
-            ],
-            [
-                'option'      => 'P4',
-                'description' => 'Kesehatan dan Disabilitas',
-                'select'      => false,
-                'table'       => 'individu_p4',
             ],
             [
                 'option'      => 'P401',
@@ -57,6 +51,12 @@ class IdvprogressController extends Controller
                 'description' => 'Fasilitas Kesehatan yang Digunakan',
                 'select'      => true,
                 'table'       => 'individu_p402',
+            ],
+            [
+                'option'      => 'P4',
+                'description' => 'Disabilitas',
+                'select'      => false,
+                'table'       => 'individu_p4',
             ],
             [
                 'option'      => 'P5',

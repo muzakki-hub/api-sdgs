@@ -32,6 +32,8 @@ class P4Api extends Controller
                 ], 404);
             }
 
+            $this->enrichP4Data($data);
+
             return response()->json([
                 'status' => true,
                 'message' => 'Data P4 berdasarkan id_kg_p2',
@@ -59,6 +61,9 @@ class P4Api extends Controller
             }
 
             $data = KgP4M::where('id_kg_p2', $idKgP2)->get();
+            foreach ($data as $item) {
+                $this->enrichP4Data($item);
+            }
 
             return response()->json([
                 'status' => true,
@@ -98,16 +103,19 @@ class P4Api extends Controller
             }
 
             // Sync meteran fields to kg_p2 if provided
-            if ($request->hasAny(['meteran_rumah', 'no_meteran', 'daya_meteran_rumah'])) {
+            if ($request->hasAny(['meteran_rumah', 'no_meteran', 'daya_meteran_rumah', 'atas_nama'])) {
                 $p2Update = [];
                 if ($request->filled('meteran_rumah')) {
                     $p2Update['meteran_rumah'] = $request->meteran_rumah;
                 }
                 if ($request->has('no_meteran')) {
-                    $p2Update['no_meteran'] = $request->no_meteran;
+                    $p2Update['no_meteran'] = $request->meteran_rumah == '1' ? $request->no_meteran : null;
                 }
                 if ($request->has('daya_meteran_rumah')) {
-                    $p2Update['daya_meteran_rumah'] = $request->daya_meteran_rumah;
+                    $p2Update['daya_meteran_rumah'] = $request->meteran_rumah == '1' ? $request->daya_meteran_rumah : null;
+                }
+                if ($request->has('atas_nama')) {
+                    $p2Update['atas_nama'] = $request->meteran_rumah == '2' ? $request->atas_nama : null;
                 }
 
                 if (!empty($p2Update)) {
@@ -200,6 +208,8 @@ class P4Api extends Controller
                 $survey->id
             );
 
+            $this->enrichP4Data($data);
+
             return response()->json([
                 'status' => true,
                 'message' => 'Data berhasil ditambahkan.',
@@ -233,6 +243,8 @@ class P4Api extends Controller
                     'message' => 'Data tidak ditemukan.'
                 ], 404);
             }
+
+            $this->enrichP4Data($data);
 
             return response()->json([
                 'status' => true,
@@ -271,16 +283,19 @@ class P4Api extends Controller
             }
 
             // Sync meteran fields to kg_p2 if provided and relation exists
-            if ($request->hasAny(['meteran_rumah', 'no_meteran', 'daya_meteran_rumah']) && $data->id_kg_p2) {
+            if ($request->hasAny(['meteran_rumah', 'no_meteran', 'daya_meteran_rumah', 'atas_nama']) && $data->id_kg_p2) {
                 $p2Update = [];
                 if ($request->filled('meteran_rumah')) {
                     $p2Update['meteran_rumah'] = $request->meteran_rumah;
                 }
                 if ($request->has('no_meteran')) {
-                    $p2Update['no_meteran'] = $request->no_meteran;
+                    $p2Update['no_meteran'] = $request->meteran_rumah == '1' ? $request->no_meteran : null;
                 }
                 if ($request->has('daya_meteran_rumah')) {
-                    $p2Update['daya_meteran_rumah'] = $request->daya_meteran_rumah;
+                    $p2Update['daya_meteran_rumah'] = $request->meteran_rumah == '1' ? $request->daya_meteran_rumah : null;
+                }
+                if ($request->has('atas_nama')) {
+                    $p2Update['atas_nama'] = $request->meteran_rumah == '2' ? $request->atas_nama : null;
                 }
 
                 if (!empty($p2Update)) {
@@ -341,6 +356,8 @@ class P4Api extends Controller
                 $data->id_survey ?? $survey?->id
             );
 
+            $this->enrichP4Data($data);
+
             return response()->json([
                 'status' => true,
                 'message' => 'Data berhasil diperbarui.',
@@ -392,4 +409,33 @@ class P4Api extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Format and enrich P4 model data before returning to frontend:
+     * 1. Normalize rumah_berada_dibawah ('Ya' => '1', 'Tidak' => '2')
+     * 2. Attach meteran fields and atas_nama from related kg_p2
+     */
+    private function enrichP4Data($data)
+    {
+        if (!$data) return;
+
+        // 1. Normalize 'rumah_berada_dibawah' ('Ya' => '1', 'Tidak' => '2')
+        if ($data->rumah_berada_dibawah === 'Ya') {
+            $data->rumah_berada_dibawah = '1';
+        } elseif ($data->rumah_berada_dibawah === 'Tidak') {
+            $data->rumah_berada_dibawah = '2';
+        }
+
+        // 2. Attach meteran fields from kg_p2
+        if ($data->id_kg_p2) {
+            $p2 = KgP2M::find($data->id_kg_p2);
+            if ($p2) {
+                $data->meteran_rumah = $p2->meteran_rumah !== null ? (string)$p2->meteran_rumah : null;
+                $data->no_meteran = $p2->no_meteran !== null ? (int)$p2->no_meteran : null;
+                $data->daya_meteran_rumah = $p2->daya_meteran_rumah !== null ? (string)$p2->daya_meteran_rumah : null;
+                $data->atas_nama = $p2->atas_nama ?? null;
+            }
+        }
+    }
 }
+

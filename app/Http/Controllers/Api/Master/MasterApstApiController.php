@@ -9,12 +9,22 @@ use Illuminate\Support\Facades\Auth;
 
 class MasterApstApiController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $data = MasterApstM::all();
+        $idP2 = $request->query('id_kg_p2') ?? $request->query('idP2');
+        $query = MasterApstM::select('id', 'nama_akses');
 
-         return response()->json([
+        if ($idP2) {
+            $query->with(['transaksi' => function ($q) use ($idP2) {
+                $q->where('id_kg_p2', $idP2)->select('id', 'id_kg_p2', 'id_master_akses_sarpras');
+            }]);
+        }
+
+        $data = $query->orderBy('id')->get();
+
+        return response()->json([
             'status' => true,
+            'message' => 'Data master sarana prasarana berhasil dimuat',
             'data' => $data
         ]);
     }

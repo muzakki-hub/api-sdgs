@@ -43,6 +43,10 @@
 
 <body>
 
+    @if(isset($cover))
+        @include('pages.pdf.partials.cover', ['cover' => $cover])
+    @endif
+
     <table class="table table-bordered table-sm data-table">
         <tr class="tr-atas" style="border: none !important">
             <th colspan="2" style="padding: 5px !important; border: none !important; text-align:left;"><b>KEMENTRIAN

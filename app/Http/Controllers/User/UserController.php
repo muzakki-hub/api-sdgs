@@ -30,6 +30,13 @@ class UserController extends Controller
                 $hp = '62' . substr($hp, 1);
             }
 
+            $rw = $request->filled('rw_tugas') ? trim((string)$request->rw_tugas) : null;
+            $rt = $request->filled('rt_tugas') ? trim((string)$request->rt_tugas) : null;
+            if (empty($rw)) {
+                $rw = null;
+                $rt = null;
+            }
+
             User::create([
                 "id" => $id,
                 "nama" => $request->nama,
@@ -39,6 +46,8 @@ class UserController extends Controller
                 "status" => $request->status,
                 "password" => Hash::make($request->password),   // <-- sesuai login
                 "alamat" => $request->alamat,
+                "rw_tugas" => $rw,
+                "rt_tugas" => $rt,
                 "id_buat" => Auth::user()->id,
                 "is_logged_in" => false, // <-- penting untuk login controller
             ]);
@@ -60,6 +69,12 @@ class UserController extends Controller
             $hp = '62' . substr($hp, 1);
         }
 
+        $rw = $request->filled('rw_tugas') ? trim((string)$request->rw_tugas) : null;
+        $rt = $request->filled('rt_tugas') ? trim((string)$request->rt_tugas) : null;
+        if (empty($rw)) {
+            $rw = null;
+            $rt = null;
+        }
 
         $user->update([
             'nama' => $request->nama,
@@ -69,6 +84,8 @@ class UserController extends Controller
             'status' => $request->status,
             'is_logged_in' => $request->is_logged_in,
             'alamat' => $request->alamat,
+            'rw_tugas' => $rw,
+            'rt_tugas' => $rt,
             'password' => $request->password ? Hash::make($request->password) : $user->password,
             'id_update' => Auth::user()->id,
         ]);

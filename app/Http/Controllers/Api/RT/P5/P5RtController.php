@@ -24,7 +24,7 @@ class P5RtController extends Controller
             'jml_pik' => 'nullable|integer',
 
             'ada_tempat_hiburan' => 'required|in:1,2',
-            'jarak_tempat_hiburan' => 'required_if:ada_tempat_hiburan,2|nullable|integer',
+            'jarak_tempat_hiburan' => 'required_if:ada_tempat_hiburan,2|nullable|numeric',
 
             'ada_pangkalan_minyak' => 'required|in:1,2',
             'ada_pangkalan_lpg' => 'required|in:1,2',
@@ -157,7 +157,7 @@ class P5RtController extends Controller
             'jml_pik' => 'nullable|integer',
 
             'ada_tempat_hiburan' => 'required|in:1,2',
-            'jarak_tempat_hiburan' => 'nullable|numeric',
+            'jarak_tempat_hiburan' => 'required_if:ada_tempat_hiburan,2|nullable|numeric',
 
             'ada_pangkalan_minyak' => 'required|in:1,2',
             'ada_pangkalan_lpg' => 'required|in:1,2',

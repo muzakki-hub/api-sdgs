@@ -9,12 +9,22 @@ use Illuminate\Support\Facades\Auth;
 
 class MasterTenkesApiController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $data = MasterTenkesM::all();
+        $idP2 = $request->query('id_kg_p2') ?? $request->query('idP2');
+        $query = MasterTenkesM::select('id', 'tenaga_kesehatan');
+
+        if ($idP2) {
+            $query->with(['transaksi' => function ($q) use ($idP2) {
+                $q->where('id_kg_p2', $idP2)->select('id', 'id_kg_p2', 'id_master_tenkes');
+            }]);
+        }
+
+        $data = $query->orderBy('id')->get();
 
         return response()->json([
             'status' => true,
+            'message' => 'Data master tenaga medis berhasil dimuat',
             'data' => $data
         ]);
     }

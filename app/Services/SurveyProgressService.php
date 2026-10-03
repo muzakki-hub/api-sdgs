@@ -27,6 +27,7 @@ class SurveyProgressService
         'tgl_update',
         'created_at',
         'updated_at',
+        'is_verified',
     ];
 
     /**
@@ -209,6 +210,62 @@ class SurveyProgressService
                 }
                 break;
 
+            case 'rt_p5':
+                if (isset($row['ada_tempat_hiburan']) && (string) $row['ada_tempat_hiburan'] === '1') {
+                    unset($row['jarak_tempat_hiburan']);
+                }
+                break;
+
+            case 'transaksi_tv_p6_rt':
+                if (isset($row['diterima']) && (string) $row['diterima'] !== '1') {
+                    unset($row['parabola']);
+                }
+                break;
+
+            case 'transaksi_guna_sumber_p7_rt':
+                if (isset($row['sungai']) && (string) $row['sungai'] !== '1') {
+                    unset($row['kondisi_sungai']);
+                }
+                if (isset($row['saluran_irigasi']) && (string) $row['saluran_irigasi'] !== '1') {
+                    unset($row['kondisi_saluran_irigasi']);
+                }
+                if (isset($row['danau']) && (string) $row['danau'] !== '1') {
+                    unset($row['kondisi_danau']);
+                }
+                if (isset($row['embung']) && (string) $row['embung'] !== '1') {
+                    unset($row['kondisi_embung']);
+                }
+                break;
+
+            case 'transaksi_pencemaran_p7_rt':
+                if (isset($row['pencemaran']) && (string) $row['pencemaran'] === '2') {
+                    unset(
+                        $row['sumber_pencemaran_pabrik'],
+                        $row['sumber_pencemaran_rumah_tangga'],
+                        $row['sumber_pencemaran_lain'],
+                        $row['dampak_kesehatan'],
+                        $row['dampak_lainnya']
+                    );
+                }
+                break;
+
+            case 'transaksi_bencana_alam_p7_rt':
+                if (isset($row['kejadian']) && (string) $row['kejadian'] === '2') {
+                    unset(
+                        $row['jml_kejadian'],
+                        $row['korban_jiwa'],
+                        $row['pengungsi'],
+                        $row['warga_terdampak']
+                    );
+                }
+                break;
+
+            case 'transaksi_klb_p9_rt':
+                if (isset($row['kejadian']) && (string) $row['kejadian'] === '2') {
+                    unset($row['jml_penderita'], $row['jml_meninggal']);
+                }
+                break;
+
             case 'rt_p11':
                 if (isset($row['ada_pos_polisi'])) {
                     if ((string) $row['ada_pos_polisi'] === '1') {
@@ -293,8 +350,8 @@ class SurveyProgressService
                 }
             }
 
-            // Jika record fisik ada dan sudah di-cache sebagai selesai, gunakan nilai cache
-            if ($cached && $cached->skor_wajib === 100) {
+            // Jika record fisik ada dan sudah di-cache sebagai selesai sempurna (100%), gunakan nilai cache
+            if ($cached && $cached->skor_wajib === 100 && $cached->skor_total === 100) {
                 return [
                     'skor_wajib' => (int) $cached->skor_wajib,
                     'skor_total' => (int) $cached->skor_total,

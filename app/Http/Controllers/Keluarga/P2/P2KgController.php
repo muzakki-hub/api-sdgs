@@ -80,18 +80,20 @@ class P2KgController extends Controller
                 'rw' => $request->rw,
                 'nama_kpl_keluarga' => $request->nama_kpl_keluarga,
                 'no_kk' => $request->no_kk,
+                'nik_kk' => $request->nik_kk ?? $request->nik,
                 'no_hp' => $request->no_hp,
                 'telp_rumah' => $request->telp_rumah,
                 'alamat' => $request->alamat,
                 'meteran_rumah' => $request->meteran_rumah,
+                'no_meteran' => $request->no_meteran,
+                'daya_meteran_rumah' => $request->daya_meteran_rumah,
+                'atas_nama' => $request->atas_nama,
             ]);
 
             return redirect()->back()->with('success', 'Data keluarga berhasil ditambahkan!');
         } catch (\Throwable $e) {
-            DB::rollBack();
-            dd('Error:', $e->getMessage());
-            Log::error('Gagal menyimpan p5: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Gagal menyimpan data.');
+            Log::error('Gagal menyimpan p2 keluarga: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal menyimpan data: ' . $e->getMessage());
         }
     }
 

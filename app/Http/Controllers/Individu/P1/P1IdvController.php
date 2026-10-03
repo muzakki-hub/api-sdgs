@@ -54,6 +54,10 @@ class P1IdvController extends Controller
                 'no_kk' => $request->no_kk,
                 'nik' => $request->nik,
                 'nama' => $request->nama,
+                'rt' => $request->rt,
+                'rw' => $request->rw,
+                'alamat' => $request->alamat,
+                'status_hubungan_keluarga' => $request->status_hubungan_keluarga,
                 'jenis_kelamin' => $request->jenis_kelamin,
                 'tempat_lahir' => $request->tempat_lahir,
                 'tgl_lahir' => $request->tgl_lahir,
@@ -71,10 +75,8 @@ class P1IdvController extends Controller
 
             return redirect()->back()->with('success', 'Data Individu P1 berhasil ditambahkan!');
         } catch (\Throwable $e) {
-            DB::rollBack();
-            dd('Error:', $e->getMessage());
             Log::error('Gagal menyimpan p1: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Gagal menyimpan data.');
+            return redirect()->back()->with('error', 'Gagal menyimpan data: ' . $e->getMessage());
         }
     }
 

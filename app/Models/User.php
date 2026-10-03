@@ -25,7 +25,11 @@ class User extends Authenticatable // Ubah ini!
         'status',
         'password',
         'alamat',
+        'tanda_tangan',
+        'rw_tugas',
+        'rt_tugas',
         'id_buat',
+        'id_update',
         'is_logged_in'
     ];
 

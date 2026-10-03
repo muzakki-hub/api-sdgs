@@ -59,22 +59,52 @@
 
     @php
 
-        class SafeData
-        {
-            private $data;
-
-            public function __construct($data = [])
+        if (!class_exists('SafeData')) {
+            class SafeData
             {
-                $this->data = is_object($data) ? (array) $data : (array) $data;
-            }
+                private $raw;
+                private $data;
 
-            public function __get($name)
-            {
-                return $this->data[$name] ?? null;
+                public function __construct($data = [])
+                {
+                    $this->raw = $data;
+                    if (is_object($data)) {
+                        if (method_exists($data, 'toArray')) {
+                            $this->data = $data->toArray();
+                        } else {
+                            $this->data = (array) $data;
+                        }
+                    } else {
+                        $this->data = (array) $data;
+                    }
+                }
+
+                public function __get($name)
+                {
+                    if (isset($this->data[$name])) {
+                        return $this->data[$name];
+                    }
+                    if (is_object($this->raw) && isset($this->raw->{$name})) {
+                        return $this->raw->{$name};
+                    }
+                    return null;
+                }
+
+                public function __isset($name)
+                {
+                    if (isset($this->data[$name]) && $this->data[$name] !== null && $this->data[$name] !== '') {
+                        return true;
+                    }
+                    if (is_object($this->raw) && isset($this->raw->{$name}) && $this->raw->{$name} !== null && $this->raw->{$name} !== '') {
+                        return true;
+                    }
+                    return false;
+                }
             }
         }
 
         // Single object
+        $user = new SafeData($data['user'] ?? $user ?? null);
         $p2 = new SafeData($data['p2'] ?? null);
         $p3 = new SafeData($data['p3'] ?? null);
         $p4 = new SafeData($data['p4'] ?? null);
@@ -84,6 +114,8 @@
         $p8 = new SafeData($data['p8'] ?? null);
         $p10 = new SafeData($data['p10'] ?? null);
         $p11 = new SafeData($data['p11'] ?? null);
+        $foto_rw = $data['foto_rw'] ?? $foto_rw ?? null;
+        $foto_rt = $data['foto_rt'] ?? $foto_rt ?? null;
 
 
         // Collection / array
@@ -160,6 +192,10 @@
         ];
     @endphp
 
+    @if(isset($cover))
+        @include('pages.pdf.partials.cover', ['cover' => $cover])
+    @endif
+
     <table class="table table-bordered table-sm">
         <tr>
             <th><b>P1</b></th>
@@ -167,7 +203,7 @@
         </tr>
         <tr>
             <th>P101</th>
-            <td>Nama: {{ $user->nama ?? '-' }}</td>
+            <td>Nama: {{ $user->nama ?? $cover['enumerator_nama'] ?? '-' }}</td>
         </tr>
         <tr>
             <th>P102</th>
@@ -204,12 +240,16 @@
             <td>Desa: {{ $p3->nama_desa ?? '-' }}</td>
         </tr>
         <tr>
+            <th></th>
+            <td>Dusun/Lingkungan: {{ $p3->nama_dusun ?? '-' }}</td>
+        </tr>
+        <tr>
             <th>P205</th>
-            <td>RT/RW: {{ $p2->rt ?? '-' }}/{{ $p2->rw ?? '-' }}</td>
+            <td>RT/RW: {{ $p4->rt ?? $p2->rt ?? '-' }}/{{ $p3->nama_rw ?? $p2->rw ?? '-' }}</td>
         </tr>
         <tr>
             <th>P206</th>
-            <td>Nama ketua RT: {{ $p4->nama_ket_rt ?? '-' ?? '-' }}</td>
+            <td>Nama ketua RT: {{ $p4->nama_ket_rt ?? '-' }}</td>
         </tr>
         <tr>
             <th>P207</th>
@@ -224,9 +264,13 @@
             <td>
                 Lokasi RT terletak di pulau (sebutkan nama pulau):
                 <div style="margin-top: 5px">
-                    @foreach ($lokasi as $idx => $item)
-                        <div>{{ $idx + 1 }}. {{ $item }}</div>
-                    @endforeach
+                    @if (is_array($lokasi) && count($lokasi) > 0)
+                        @foreach ($lokasi as $idx => $item)
+                            <div>{{ $idx + 1 }}. {{ $item }}</div>
+                        @endforeach
+                    @else
+                        -
+                    @endif
                 </div>
             </td>
         </tr>
@@ -354,8 +398,12 @@
             <td style="width: 90% !important;"><b>DESKRIPSI PENGURUS RW</b></td>
         </tr>
         <tr>
+            <th></th>
+            <td>RW / Dusun: RW {{ $p3->nama_rw ?? '-' }} - Dusun {{ $p3->nama_dusun ?? '-' }}</td>
+        </tr>
+        <tr>
             <th>P301</th>
-            <td>Nama Ketua RW (dan foto): {{ $p3->nama_ket_rw ?? '-' }}</td>
+            <td>Nama Ketua RW (dan foto): {{ $p3->nama_ket_rw ?? '-' }}@if (!empty($foto_rw) && file_exists($foto_rw)) <span style="font-size: 9px; color: #555;"><i>(Foto terlampir)</i></span>@endif</td>
         </tr>
         <tr>
             <th>P302</th>
@@ -368,7 +416,7 @@
         <tr>
             <th>P304</th>
             <td>Menjabat Ketua RW sejak tahun:
-                {{ isset($p3->tahun_jabat_ket_rw) ? date('Y', strtotime($p3->tahun_jabat_ket_rw)) : '-' }}</td>
+                {{ isset($p3->tahun_jabat_ket_rw) ? (strtotime($p3->tahun_jabat_ket_rw) ? date('Y', strtotime($p3->tahun_jabat_ket_rw)) : $p3->tahun_jabat_ket_rw) : '-' }}</td>
         </tr>
         <tr>
             <th>P305</th>
@@ -385,7 +433,7 @@
         <tr>
             <th>P308</th>
             <td>Menjabat Sekretaris RW sejak tahun:
-                {{ isset($p3->tahun_jabat_sek_rw) ? date('Y', strtotime($p3->tahun_jabat_sek_rw)) : '-' }}</td>
+                {{ isset($p3->tahun_jabat_sek_rw) ? (strtotime($p3->tahun_jabat_sek_rw) ? date('Y', strtotime($p3->tahun_jabat_sek_rw)) : $p3->tahun_jabat_sek_rw) : '-' }}</td>
         </tr>
         <tr>
             <th>P309</th>
@@ -402,7 +450,7 @@
         <tr>
             <th>P312</th>
             <td>Menjabat Bendahara RW sejak tahun:
-                {{ isset($p3->tahun_jabat_bend_rw) ? date('Y', strtotime($p3->tahun_jabat_bend_rw)) : '-' }}</td>
+                {{ isset($p3->tahun_jabat_bend_rw) ? (strtotime($p3->tahun_jabat_bend_rw) ? date('Y', strtotime($p3->tahun_jabat_bend_rw)) : $p3->tahun_jabat_bend_rw) : '-' }}</td>
         </tr>
         <tr class="empty-row">
             <th></th>
@@ -416,7 +464,7 @@
         </tr>
         <tr>
             <th>P401</th>
-            <td>Nama Ketua RT (dan foto): {{ $p4->nama_ket_rt ?? '-' }}</td>
+            <td>Nama Ketua RT (dan foto): {{ $p4->nama_ket_rt ?? '-' }}@if (!empty($foto_rt) && file_exists($foto_rt)) <span style="font-size: 9px; color: #555;"><i>(Foto terlampir)</i></span>@endif</td>
         </tr>
         <tr>
             <th>P402</th>
@@ -429,7 +477,7 @@
         <tr>
             <th>P404</th>
             <td>Menjabat Ketua RT sejak tahun:
-                {{ isset($p4->tahun_jabat_ket_rt) ? date('Y', strtotime($p4->tahun_jabat_ket_rt)) : '-' }}</td>
+                {{ isset($p4->tahun_jabat_ket_rt) ? (strtotime($p4->tahun_jabat_ket_rt) ? date('Y', strtotime($p4->tahun_jabat_ket_rt)) : $p4->tahun_jabat_ket_rt) : '-' }}</td>
         </tr>
         <tr>
             <th>P405</th>
@@ -446,7 +494,7 @@
         <tr>
             <th>P408</th>
             <td>Menjabat Sekretaris RT sejak tahun:
-                {{ isset($p4->tahun_jabat_sek_rt) ? date('Y', strtotime($p4->tahun_jabat_sek_rt)) : '-' }}</td>
+                {{ isset($p4->tahun_jabat_sek_rt) ? (strtotime($p4->tahun_jabat_sek_rt) ? date('Y', strtotime($p4->tahun_jabat_sek_rt)) : $p4->tahun_jabat_sek_rt) : '-' }}</td>
         </tr>
         <tr>
             <th>P409</th>
@@ -463,7 +511,7 @@
         <tr>
             <th>P412</th>
             <td>Menjabat Bendahara RT sejak tahun:
-                {{ isset($p4->tahun_jabat_bend_rt) ? date('Y', strtotime($p4->tahun_jabat_bend_rt)) : '-' }}</td>
+                {{ isset($p4->tahun_jabat_bend_rt) ? (strtotime($p4->tahun_jabat_bend_rt) ? date('Y', strtotime($p4->tahun_jabat_bend_rt)) : $p4->tahun_jabat_bend_rt) : '-' }}</td>
         </tr>
 
         <tr class="empty-row">
@@ -1024,7 +1072,7 @@
             <td>
                 Nama sungai yang melintasi:<br>
                 @php
-                    $sungai = json_decode($p7->nama_sungai, true) ?? [];
+                    $sungai = json_decode($p7->nama_sungai ?? '[]', true) ?? [];
                     $sungai = is_array($sungai) ? $sungai : [];
                 @endphp
                 @if (count($sungai) > 0)
@@ -1041,7 +1089,7 @@
             <td>
                 Nama danau/waduk/situ:<br>
                 @php
-                    $danau = json_decode($p7->nama_danau, true) ?? [];
+                    $danau = json_decode($p7->nama_danau ?? '[]', true) ?? [];
                     $danau = is_array($danau) ? $danau : [];
                 @endphp
                 @if (count($danau) > 0)
@@ -1792,7 +1840,7 @@
         <td>
             Situs cagar budaya (sebutkan)<br>
             @php
-                $cagar_budaya = json_decode($p10->cagar_budaya, true) ?? [];
+                $cagar_budaya = json_decode($p10->cagar_budaya ?? '[]', true) ?? [];
             @endphp
             @foreach($cagar_budaya as $index => $item)
                 {{ $index + 1 }}. {{ $item }}<br>
@@ -1832,10 +1880,10 @@
                 <tr>
                     <td style="border: none; padding: 2px; width: 50%; vertical-align: top;">
                         @php
-                            $kearifan_kehamilan = json_decode($p10->kearifan_kehamilan, true) ?? [];
-                            $kearifan_kelahiran = json_decode($p10->kearifan_kelahiran, true) ?? [];
-                            $kearifan_pekerjaan = json_decode($p10->kearifan_pekerjaan, true) ?? [];
-                            $kearifan_alam = json_decode($p10->kearifan_alam, true) ?? [];
+                            $kearifan_kehamilan = json_decode($p10->kearifan_kehamilan ?? '[]', true) ?? [];
+                            $kearifan_kelahiran = json_decode($p10->kearifan_kelahiran ?? '[]', true) ?? [];
+                            $kearifan_pekerjaan = json_decode($p10->kearifan_pekerjaan ?? '[]', true) ?? [];
+                            $kearifan_alam = json_decode($p10->kearifan_alam ?? '[]', true) ?? [];
                         @endphp
                         1. Kehamilan: {{ implode(', ', $kearifan_kehamilan) ?: '......' }}<br>
                         2. Kelahiran: {{ implode(', ', $kearifan_kelahiran) ?: '......' }}<br>
@@ -1844,9 +1892,9 @@
                     </td>
                     <td style="border: none; padding: 2px; width: 50%; vertical-align: top;">
                         @php
-                            $kearifan_perkawinan = json_decode($p10->kearifan_perkawinan, true) ?? [];
-                            $kearifan_kehidupan = json_decode($p10->kearifan_kehidupan, true) ?? [];
-                            $kearifan_kematian = json_decode($p10->kearifan_kematian, true) ?? [];
+                            $kearifan_perkawinan = json_decode($p10->kearifan_perkawinan ?? '[]', true) ?? [];
+                            $kearifan_kehidupan = json_decode($p10->kearifan_kehidupan ?? '[]', true) ?? [];
+                            $kearifan_kematian = json_decode($p10->kearifan_kematian ?? '[]', true) ?? [];
                         @endphp
                         5. Perkawinan: {{ implode(', ', $kearifan_perkawinan) ?: '......' }}<br>
                         6. Kehidupan warga: {{ implode(', ', $kearifan_kehidupan) ?: '......' }}<br>
@@ -2137,6 +2185,51 @@
 </tr>
 
     </table>
+
+    @php
+        $hasFotoRw = !empty($foto_rw) && file_exists($foto_rw);
+        $hasFotoRt = !empty($foto_rt) && file_exists($foto_rt);
+    @endphp
+
+    @if ($hasFotoRw || $hasFotoRt)
+        <div style="page-break-before: always;">
+            <div style="text-align: center; margin-bottom: 25px;">
+                <h4 style="margin: 0; font-size: 14px; font-weight: bold; text-transform: uppercase;">LAMPIRAN DOKUMENTASI FOTO</h4>
+                <p style="margin: 5px 0 0 0; font-size: 11px; color: #555;">Kuesioner SDGs Desa - Rukun Tetangga (RT {{ $p4->rt ?? '-' }} / RW {{ $p3->nama_rw ?? '-' }})</p>
+                <hr style="border: 0; border-top: 1.5px solid #000; margin-top: 10px; margin-bottom: 20px;">
+            </div>
+
+            <table style="width: 100%; border: none !important; border-collapse: separate; border-spacing: 20px 10px;">
+                <tr>
+                    @if ($hasFotoRw)
+                        <td style="width: {{ $hasFotoRt ? '50%' : '100%' }}; border: 1px solid #333; padding: 15px; text-align: center; vertical-align: top; background-color: #fafafa;">
+                            <div style="font-weight: bold; font-size: 12px; margin-bottom: 8px;">FOTO KETUA RW</div>
+                            <div style="font-size: 10.5px; margin-bottom: 12px; color: #333; line-height: 1.4;">
+                                <div><strong>Nama:</strong> {{ $p3->nama_ket_rw ?? '-' }}</div>
+                                <div><strong>RW:</strong> {{ $p3->nama_rw ?? '-' }} - Dusun {{ $p3->nama_dusun ?? '-' }}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <img src="{{ $foto_rw }}" alt="Foto Ketua RW" style="max-height: 320px; max-width: 95%; border: 1px solid #bbb; object-fit: contain;">
+                            </div>
+                        </td>
+                    @endif
+
+                    @if ($hasFotoRt)
+                        <td style="width: {{ $hasFotoRw ? '50%' : '100%' }}; border: 1px solid #333; padding: 15px; text-align: center; vertical-align: top; background-color: #fafafa;">
+                            <div style="font-weight: bold; font-size: 12px; margin-bottom: 8px;">FOTO KETUA RT</div>
+                            <div style="font-size: 10.5px; margin-bottom: 12px; color: #333; line-height: 1.4;">
+                                <div><strong>Nama:</strong> {{ $p4->nama_ket_rt ?? '-' }}</div>
+                                <div><strong>RT:</strong> {{ $p4->rt ?? '-' }} / RW {{ $p3->nama_rw ?? '-' }}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <img src="{{ $foto_rt }}" alt="Foto Ketua RT" style="max-height: 320px; max-width: 95%; border: 1px solid #bbb; object-fit: contain;">
+                            </div>
+                        </td>
+                    @endif
+                </tr>
+            </table>
+        </div>
+    @endif
 
 </body>
 

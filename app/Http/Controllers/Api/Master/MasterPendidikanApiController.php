@@ -9,12 +9,22 @@ use Illuminate\Support\Facades\Auth;
 
 class MasterPendidikanApiController extends Controller
 {
-     public function index()
+     public function index(Request $request)
     { 
-        $data = MasterPendidikanM::all();
+        $idP2 = $request->query('id_kg_p2') ?? $request->query('idP2');
+        $query = MasterPendidikanM::select('id', 'jenjang_pendidikan');
+
+        if ($idP2) {
+            $query->with(['transaksi' => function ($q) use ($idP2) {
+                $q->where('id_kg_p2', $idP2)->select('id', 'id_kg_p2', 'id_master_pendidikan');
+            }]);
+        }
+
+        $data = $query->orderBy('id')->get();
         
         return response()->json([
             'status' => true,
+            'message' => 'Data master pendidikan berhasil dimuat',
             'data' => $data
         ]);
     }

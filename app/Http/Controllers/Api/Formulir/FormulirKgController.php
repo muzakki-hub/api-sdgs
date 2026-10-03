@@ -18,10 +18,11 @@ use App\Models\Master\MasterApstM;
 
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
+use App\Services\CoverDataService;
 
 class FormulirKgController extends Controller
 {
-    public function download($id_p2)
+    public function download(Request $request, $id_p2)
 {
     try {
         // ========================
@@ -43,9 +44,27 @@ class FormulirKgController extends Controller
         $p424 = KgP424M::with('masterApst')->where('id_kg_p2', $p2->id)->get();
         $masterApst = MasterApstM::get();
 
-        $user = Auth::user();
+        $enumerator = CoverDataService::resolveEnumerator($p2, $request);
+        $wilayah = CoverDataService::resolveWilayah();
+
+        $cover = [
+            'level' => 'keluarga',
+            'header_img' => CoverDataService::getHeaderImageBase64(),
+            'no_kk' => $p2->no_kk ?? '-',
+            'nama_kepala_keluarga' => $p2->nama_kpl_keluarga ?? '',
+            'alamat_dusun' => $p2->alamat ?? '',
+            'desa' => $p2->desa?->nama ?? $wilayah['desa'],
+            'kecamatan' => $p2->kecamatan?->nama ?? $wilayah['kecamatan'],
+            'kabupaten' => $p2->kabupaten?->nama ?? $wilayah['kabupaten'],
+            'enumerator_nama' => $enumerator['nama'],
+            'enumerator_jabatan' => $enumerator['jabatan'],
+            'enumerator_ttd' => $enumerator['ttd'] ?? '',
+        ];
+
+        $user = CoverDataService::getEnumeratorUser($p2, $request);
 
         $data = [
+            'cover'      => $cover,
             'user'       => $user,
             'p2'         => $p2,
             'p4'         => $p4,
@@ -68,8 +87,11 @@ class FormulirKgController extends Controller
             ], 500);
         }
 
-        $id_survey = $p2->id_survey;
-        return $pdf->stream("sdgs-keluarga-$id_survey.pdf");
+        $filename = "sdgs-keluarga-{$p2->id}.pdf";
+        if ($request->has('stream')) {
+            return $pdf->stream($filename);
+        }
+        return $pdf->download($filename);
 
     } catch (\Exception $e) {
 
@@ -85,8 +107,8 @@ class FormulirKgController extends Controller
     }
 }
 
-    public function view($id_p2)
+    public function view(Request $request, $id_p2)
     {
-        return $this->download($id_p2);
+        return $this->download($request, $id_p2);
     }
 }

@@ -9,9 +9,18 @@ use Carbon\Carbon;
 
 class MasterPenyakitApiController extends Controller
 {
-     public function index()
+     public function index(Request $request)
     {
-        $data = MasterPenyakitM::orderBy('jenis_penyakit')->get();
+        $idP1 = $request->query('id_individu_p1') ?? $request->query('idP1');
+        $query = MasterPenyakitM::select('id', 'jenis_penyakit');
+
+        if ($idP1) {
+            $query->with(['transaksi' => function ($q) use ($idP1) {
+                $q->where('id_individu_p1', $idP1)->select('id', 'id_individu_p1', 'id_master_penyakit');
+            }]);
+        }
+
+        $data = $query->orderBy('jenis_penyakit')->get();
 
         return response()->json([
             'status' => true,

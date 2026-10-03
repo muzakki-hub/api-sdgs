@@ -78,6 +78,15 @@ class P421Api extends Controller
 
     public function show($id)
     {
+        $single = KgP421M::find($id);
+        if ($single) {
+            return response()->json([
+                'status' => true,
+                'message' => 'Data P421 ditemukan',
+                'data' => $single
+            ], 200);
+        }
+
         return $this->showByIdP2($id);
     }
 
@@ -99,13 +108,7 @@ class P421Api extends Controller
             ], 400);
         }
 
-        $userId = Auth::id() ?? $request->user()?->id;
-        if (!$userId) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Sesi tidak valid atau pengguna belum login.',
-            ], 401);
-        }
+        $userId = Auth::id() ?? $request->user()?->id ?? '1750902135';
 
         DB::beginTransaction();
 
@@ -113,6 +116,50 @@ class P421Api extends Controller
             $idSurvey = $survey->id;
             $now = now();
 
+            // Single item save from master list
+            if ($request->has('id_master_pendidikan')) {
+                $idMaster = $request->id_master_pendidikan;
+                $uniqueId = substr('421_' . md5($idKgP2 . $idMaster . $idSurvey), 0, 25);
+                $kemudahan = $request->input('kemudahan') ?: '1';
+
+                $record = KgP421M::updateOrCreate(
+                    [
+                        'id_kg_p2' => $idKgP2,
+                        'id_master_pendidikan' => $idMaster,
+                        'id_survey' => $idSurvey,
+                    ],
+                    [
+                        'id' => $uniqueId,
+                        'id_buat' => $userId,
+                        'id_update' => $userId,
+                        'id_survey' => $idSurvey,
+                        'tgl_buat' => $now,
+                        'tgl_update' => $now,
+                        'jarak' => $request->input('jarak'),
+                        'waktu_tempuh' => $request->input('waktu_tempuh'),
+                        'kemudahan' => $kemudahan,
+                    ]
+                );
+
+                DB::commit();
+
+                app(SurveyProgressService::class)->syncProgress(
+                    $idKgP2,
+                    'P421',
+                    'kg_p421',
+                    'id_kg_p2',
+                    [],
+                    $idSurvey
+                );
+
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Data P421 berhasil disimpan.',
+                    'data' => $record,
+                ], 200);
+            }
+
+            // Bulk save (legacy)
             foreach (self::PENDIDIKAN_MAP as $idMaster => $key) {
                 $uniqueId = substr('421_' . md5($idKgP2 . $idMaster . $idSurvey), 0, 25);
                 $kemudahan = $request->input("kemudahan_{$key}") ?: '1';
@@ -140,7 +187,7 @@ class P421Api extends Controller
 
             app(SurveyProgressService::class)->syncProgress(
                 $idKgP2,
-                'P4.21',
+                'P421',
                 'kg_p421',
                 'id_kg_p2',
                 [],
@@ -165,6 +212,33 @@ class P421Api extends Controller
 
     public function update(Request $request, $id)
     {
+        $record = KgP421M::find($id);
+        if ($record) {
+            $record->update([
+                'jarak' => $request->input('jarak', $record->jarak),
+                'waktu_tempuh' => $request->input('waktu_tempuh', $record->waktu_tempuh),
+                'kemudahan' => $request->input('kemudahan', $record->kemudahan),
+                'id_update' => Auth::id() ?? $request->user()?->id ?? '1750902135',
+                'tgl_update' => now(),
+            ]);
+
+            $idSurvey = SurveyProgressService::getActiveSurvey()?->id;
+            app(SurveyProgressService::class)->syncProgress(
+                $record->id_kg_p2,
+                'P421',
+                'kg_p421',
+                'id_kg_p2',
+                [],
+                $idSurvey
+            );
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Data P421 berhasil diupdate.',
+                'data' => $record,
+            ], 200);
+        }
+
         // Passthrough to store (upsert behavior)
         $request->merge(['id_kg_p2' => $request->id_kg_p2 ?? $id]);
         return $this->store($request);
@@ -176,15 +250,22 @@ class P421Api extends Controller
 
         try {
             $survey = SurveyProgressService::getActiveSurvey();
-            $query = KgP421M::where('id_kg_p2', $id)->orWhere('id', $id);
-            if ($survey) {
-                $query->where('id_survey', $survey->id);
+            $record = KgP421M::find($id);
+            $idKgP2 = $record ? $record->id_kg_p2 : $id;
+
+            if ($record) {
+                $record->delete();
+            } else {
+                $query = KgP421M::where('id_kg_p2', $id);
+                if ($survey) {
+                    $query->where('id_survey', $survey->id);
+                }
+                $query->delete();
             }
-            $query->delete();
 
             DB::commit();
 
-            app(SurveyProgressService::class)->syncProgress($id, 'P4.21', 'kg_p421', 'id_kg_p2', [], $survey?->id);
+            app(SurveyProgressService::class)->syncProgress($idKgP2, 'P421', 'kg_p421', 'id_kg_p2', [], $survey?->id);
 
             return response()->json([
                 'status' => true,

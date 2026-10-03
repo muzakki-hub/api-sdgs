@@ -48,10 +48,30 @@ class SurveyTransferController extends Controller
         $level = strtolower($request->query('level', 'rt'));
 
         if ($level === 'individu' || $level === 'idv') {
-            $individuals = \Illuminate\Support\Facades\DB::table('individu_p1')
-                ->select('id', 'nama', 'nik')
-                ->orderBy('nama', 'asc')
-                ->get();
+            $activeSurvey = \App\Services\SurveyProgressService::getActiveSurvey();
+            $prevSurvey = \App\Services\SurveyCopyService::getPreviousSurvey($activeSurvey);
+
+            $queryActive = \Illuminate\Support\Facades\DB::table('individu_p1')
+                ->select('id', 'nama', 'nik');
+            if ($activeSurvey) {
+                $queryActive->where('id_survey', $activeSurvey->id);
+            }
+            $individuals = $queryActive->orderBy('nama', 'asc')->get();
+
+            if ($individuals->isEmpty() && $prevSurvey) {
+                $individuals = \Illuminate\Support\Facades\DB::table('individu_p1')
+                    ->select('id', 'nama', 'nik')
+                    ->where('id_survey', $prevSurvey->id)
+                    ->orderBy('nama', 'asc')
+                    ->get();
+            }
+
+            if ($individuals->isEmpty()) {
+                $individuals = \Illuminate\Support\Facades\DB::table('individu_p1')
+                    ->select('id', 'nama', 'nik')
+                    ->orderBy('nama', 'asc')
+                    ->get();
+            }
 
             $targets = $individuals->map(fn($ind) => [
                 'id' => $ind->id,
@@ -78,14 +98,37 @@ class SurveyTransferController extends Controller
         }
 
         if ($level === 'keluarga' || $level === 'kg') {
-            $families = \Illuminate\Support\Facades\DB::table('kg_p2')
-                ->select('id', 'nama_kk', 'no_kk')
-                ->orderBy('nama_kk', 'asc')
-                ->get();
+            $activeSurvey = \App\Services\SurveyProgressService::getActiveSurvey();
+            $prevSurvey = \App\Services\SurveyCopyService::getPreviousSurvey($activeSurvey);
+
+            // 1. Prioritaskan keluarga yang sudah ada di survei aktif
+            $queryActive = \Illuminate\Support\Facades\DB::table('kg_p2')
+                ->select('id', 'nama_kpl_keluarga', 'no_kk');
+            if ($activeSurvey) {
+                $queryActive->where('id_survey', $activeSurvey->id);
+            }
+            $families = $queryActive->orderBy('nama_kpl_keluarga', 'asc')->get();
+
+            // 2. Jika survei aktif belum memiliki data keluarga, ambil keluarga dari survei sebelumnya
+            if ($families->isEmpty() && $prevSurvey) {
+                $families = \Illuminate\Support\Facades\DB::table('kg_p2')
+                    ->select('id', 'nama_kpl_keluarga', 'no_kk')
+                    ->where('id_survey', $prevSurvey->id)
+                    ->orderBy('nama_kpl_keluarga', 'asc')
+                    ->get();
+            }
+
+            // 3. Fallback jika masih kosong (ambil semua)
+            if ($families->isEmpty()) {
+                $families = \Illuminate\Support\Facades\DB::table('kg_p2')
+                    ->select('id', 'nama_kpl_keluarga', 'no_kk')
+                    ->orderBy('nama_kpl_keluarga', 'asc')
+                    ->get();
+            }
 
             $targets = $families->map(fn($f) => [
                 'id' => $f->id,
-                'label' => 'KK ' . ($f->nama_kk ?? $f->no_kk),
+                'label' => 'KK ' . ($f->nama_kpl_keluarga ?? $f->no_kk),
             ])->values();
 
             $groups = [];

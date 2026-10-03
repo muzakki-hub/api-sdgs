@@ -9,9 +9,18 @@ use Illuminate\Support\Facades\Auth;
 
 class MasterPenghasilanApiController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $data = MasterPenghasilanM::orderBy('nama_komoditas')->get();
+        $idP1 = $request->query('id_individu_p1') ?? $request->query('idP1');
+        $query = MasterPenghasilanM::select('id', 'nama_komoditas');
+
+        if ($idP1) {
+            $query->with(['transaksi' => function ($q) use ($idP1) {
+                $q->where('id_individu_p1', $idP1)->select('id', 'id_individu_p1', 'id_master_penghasilan');
+            }]);
+        }
+
+        $data = $query->orderBy('nama_komoditas')->get();
 
         return response()->json([
             'status' => true,
